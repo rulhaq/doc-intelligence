@@ -1,0 +1,23 @@
+﻿MASTER SERVICE AGREEMENT
+
+This Master Service Agreement is entered into on October 21, 2025
+
+PARTIES:
+Client: TechCorp Industries LLC
+Provider: CloudSoft Solutions Inc
+
+CONTRACT TERMS:
+- Contract Value: 500,000 USD annually
+- Duration: 36 months (3 years)
+- Payment Terms: Quarterly in advance
+- Services: Cloud infrastructure management and support
+- SLA: 99.9% uptime guarantee
+- Support: 24/7 technical support included
+
+DELIVERABLES:
+1. Infrastructure setup and migration (Month 1-2)
+2. Ongoing monitoring and maintenance
+3. Quarterly performance reports
+4. Annual security audits
+
+This agreement shall commence on November 1, 2025

@@ -1,0 +1,31 @@
+# FastAPI
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+
+# OCR
+paddleocr==2.7.3
+paddlepaddle==2.6.2
+layoutparser[ocr]==0.3.4
+
+# PDF Processing
+pdf2image==1.17.0
+Pillow==10.2.0
+pypdf==4.0.1
+
+# HTTP Client
+httpx==0.26.0
+
+# Logging
+structlog==24.1.0
+prometheus-client==0.20.0
+
+# Utilities
+python-dotenv==1.0.1
+
+# NumPy (fix ABI compatibility)
+numpy==1.26.4
+
+# OpenCV (headless version for compatibility with PaddleOCR)
+opencv-python-headless==4.8.1.78
+

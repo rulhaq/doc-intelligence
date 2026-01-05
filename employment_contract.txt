@@ -1,0 +1,23 @@
+﻿EMPLOYMENT CONTRACT
+
+Employee: John Smith
+Position: Senior Software Engineer
+Department: Engineering
+
+Contract Terms:
+- Duration: 24 months from January 1, 2025
+- Salary: \,000 per year
+- Benefits: Health insurance, 401k matching, 20 days PTO
+- Work Location: Hybrid (3 days office, 2 days remote)
+- Probation Period: 90 days
+
+Responsibilities:
+- Develop and maintain web applications
+- Lead technical design discussions
+- Mentor junior developers
+- Participate in code reviews
+
+This contract is effective immediately upon signature.
+
+Signed: _________________________
+Date: January 1, 2025

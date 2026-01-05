@@ -1,0 +1,15 @@
+﻿SAMPLE CONTRACT DOCUMENT
+
+This is a test contract between Party A and Party B.
+
+TERMS AND CONDITIONS:
+1. The contract duration is 12 months
+2. Payment terms: Net 30 days
+3. Delivery: Within 5 business days
+4. Warranties: Standard manufacturer warranty applies
+
+PARTIES:
+Party A: ABC Corporation
+Party B: XYZ Industries
+
+This contract is binding upon signature.

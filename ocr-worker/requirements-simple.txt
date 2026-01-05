@@ -1,0 +1,23 @@
+# Core
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+
+# OCR - Lightweight alternatives
+pytesseract==0.3.10
+pdf2image==1.17.0
+Pillow==10.2.0
+pypdf==4.0.1
+
+# HTTP
+httpx==0.26.0
+
+# Redis
+redis==5.0.1
+
+# Logging
+structlog==24.1.0
+
+# Utilities
+python-dotenv==1.0.1
+

@@ -1,0 +1,204 @@
+{
+  "dashboard": {
+    "title": "CustomerLLM - Application Monitoring",
+    "tags": ["customerllm", "fastapi", "ai"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "type": "graph",
+        "title": "API Request Rate",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"backend\"}[5m])",
+            "legendFormat": "{{method}} {{handler}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "Requests/sec", "show": true},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "type": "graph",
+        "title": "Response Time (p95)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"backend\"}[5m]))",
+            "legendFormat": "{{handler}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "Seconds", "show": true, "format": "s"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+        "type": "stat",
+        "title": "Total Requests (24h)",
+        "targets": [
+          {
+            "expr": "sum(increase(http_requests_total{job=\"backend\"}[24h]))"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "fields": "",
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 8},
+        "type": "stat",
+        "title": "Error Rate (5m)",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"backend\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"backend\"}[5m])) * 100"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "unit": "percent"
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {"value": 0, "color": "green"},
+            {"value": 1, "color": "yellow"},
+            {"value": 5, "color": "red"}
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 8},
+        "type": "stat",
+        "title": "Active Conversations",
+        "targets": [
+          {
+            "expr": "sum(conversation_active_total{job=\"backend\"})"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none"
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 8},
+        "type": "stat",
+        "title": "Documents in Vector DB",
+        "targets": [
+          {
+            "expr": "qdrant_collections_vectors_total{collection=\"documents\"}"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "type": "graph",
+        "title": "LLM Inference Time",
+        "targets": [
+          {
+            "expr": "rate(llm_inference_duration_seconds_sum{job=\"backend\"}[5m]) / rate(llm_inference_duration_seconds_count{job=\"backend\"}[5m])",
+            "legendFormat": "Avg Inference Time"
+          }
+        ],
+        "yaxes": [
+          {"label": "Seconds", "show": true, "format": "s"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "type": "graph",
+        "title": "Database Connections",
+        "targets": [
+          {
+            "expr": "db_connection_pool_size{job=\"backend\"}",
+            "legendFormat": "Pool Size"
+          },
+          {
+            "expr": "db_connection_pool_in_use{job=\"backend\"}",
+            "legendFormat": "In Use"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 22},
+        "type": "table",
+        "title": "Recent API Errors",
+        "targets": [
+          {
+            "expr": "topk(10, rate(http_requests_total{job=\"backend\",status=~\"[45]..\"}[5m]))",
+            "format": "table"
+          }
+        ],
+        "options": {
+          "showHeader": true
+        }
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 30},
+        "type": "graph",
+        "title": "OCR Processing Queue",
+        "targets": [
+          {
+            "expr": "ocr_queue_size{job=\"ocr-worker\"}",
+            "legendFormat": "Queue Size"
+          },
+          {
+            "expr": "rate(ocr_documents_processed_total{job=\"ocr-worker\"}[5m])",
+            "legendFormat": "Processing Rate"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 30},
+        "type": "graph",
+        "title": "Memory Usage",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=\"backend\"}",
+            "legendFormat": "Backend"
+          },
+          {
+            "expr": "process_resident_memory_bytes{job=\"ocr-worker\"}",
+            "legendFormat": "OCR Worker"
+          }
+        ],
+        "yaxes": [
+          {"label": "Bytes", "show": true, "format": "bytes"},
+          {"show": false}
+        ]
+      }
+    ]
+  }
+}
+
