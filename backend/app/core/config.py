@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_NAME: str = "nomic-embed-text:latest"
     EMBEDDING_DIMENSION: int = 768
     EMBEDDING_BATCH_SIZE: int = 32
+    MIN_SIMILARITY: float = 0.72
     
     # OCR Configuration
     OCR_WORKER_URL: str

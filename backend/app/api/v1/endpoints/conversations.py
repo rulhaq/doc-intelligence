@@ -8,6 +8,19 @@ import time
 import structlog
 
 from app.core.database import get_db
+from app.core.config import settings
+from app.core.guardrails import (
+    detect_explicit_language,
+    detect_language,
+    is_ambiguous_language,
+    is_greeting,
+    is_illegal_request,
+    greeting_response,
+    illegal_request_response,
+    insufficient_info_response,
+    ambiguous_language_response,
+    empty_message_response,
+)
 from app.core.security import get_current_active_user
 from app.core.exceptions import NotFoundException, AuthorizationException
 from app.models.user import User
@@ -22,9 +35,46 @@ from app.schemas.conversation import (
 )
 from app.services.vector.qdrant_service import QdrantService
 from app.services.inference.ollama_service import OllamaService
+from app.core.prompts import SYSTEM_PROMPT
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+
+def _format_citation(payload: dict, fallback_id: str) -> str:
+    doc_name = payload.get("title") or payload.get("doc_title") or payload.get("doc_name") or "Document"
+    page = payload.get("page_number") or payload.get("page")
+    if page is not None:
+        return f"(Doc: {doc_name}, p.{page})"
+    chunk_id = payload.get("chunk_id") or fallback_id
+    return f"(Doc: {doc_name}, chunk {chunk_id})"
+
+
+def _build_context_and_citations(results: List[dict]) -> tuple[list[str], list[str]]:
+    context_docs = []
+    citations = []
+    for result in results:
+        payload = result.get("payload") or {}
+        text = payload.get("text", "")
+        if not text:
+            continue
+        citation = _format_citation(payload, result.get("id", "unknown"))
+        context_docs.append(f"[{citation}] {text}")
+        citations.append(citation)
+    unique_citations = []
+    for citation in citations:
+        if citation not in unique_citations:
+            unique_citations.append(citation)
+    return context_docs, unique_citations
+
+
+def _build_citations_output(citations: List[str], lang: str) -> str:
+    if not citations:
+        return ""
+    label = "\u0627\u0644\u0645\u0635\u0627\u062f\u0631" if lang == "ar" else "Sources"
+    lines = "\n".join(f"- {citation}" for citation in citations)
+    return f"\n\n{label}:\n{lines}"
+
 
 
 @router.post("", response_model=ConversationResponse)
@@ -125,10 +175,71 @@ async def send_message(
     db.add(user_message)
     db.commit()
     
-    # If the message is empty, return a prompt message
-    if not request.text or not request.text.strip():
-        prompt_text = "It looks like you didn't ask a question. How can I help you? Please ask a question about the available documents."
+    user_text = request.text or ""
+    if not user_text.strip():
+        response_lang = detect_language(user_text) or "en"
+        prompt_text = empty_message_response(response_lang)
 
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            text=prompt_text,
+            cards=[],
+            sources=[],
+            inference_time_ms=0,
+        )
+        db.add(assistant_message)
+        db.commit()
+        db.refresh(assistant_message)
+
+        response = MessageResponse.model_validate(assistant_message)
+        response.cards = []
+        response.sources = []
+        return response
+
+    explicit_lang = detect_explicit_language(user_text)
+    if not explicit_lang and is_ambiguous_language(user_text):
+        prompt_text = ambiguous_language_response()
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            text=prompt_text,
+            cards=[],
+            sources=[],
+            inference_time_ms=0,
+        )
+        db.add(assistant_message)
+        db.commit()
+        db.refresh(assistant_message)
+
+        response = MessageResponse.model_validate(assistant_message)
+        response.cards = []
+        response.sources = []
+        return response
+
+    response_lang = explicit_lang or detect_language(user_text) or "en"
+
+    if is_greeting(user_text):
+        prompt_text = greeting_response(response_lang)
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            text=prompt_text,
+            cards=[],
+            sources=[],
+            inference_time_ms=0,
+        )
+        db.add(assistant_message)
+        db.commit()
+        db.refresh(assistant_message)
+
+        response = MessageResponse.model_validate(assistant_message)
+        response.cards = []
+        response.sources = []
+        return response
+
+    if is_illegal_request(user_text):
+        prompt_text = illegal_request_response(response_lang)
         assistant_message = Message(
             conversation_id=conversation.id,
             role="assistant",
@@ -161,26 +272,63 @@ async def send_message(
     if request.context_filters:
         if request.context_filters.source:
             search_filters["source"] = request.context_filters.source[0]  # First source
-    
+
     search_results = await qdrant_service.search(
         query_vector=query_embedding,
-        limit=10,  # Get more results for better context
-        score_threshold=0.3,  # Lower threshold to include more relevant docs
+        limit=10,
+        score_threshold=None,
         filters=search_filters,
     )
-    
+
     logger.info(f"RAG Search: Found {len(search_results)} results for query: '{request.text[:50]}...'")
-    
-    # 2. Build context from search results
-    context_docs = []
+
+    relevant_results = [
+        result for result in search_results if result["score"] >= settings.MIN_SIMILARITY
+    ]
+
+    if not relevant_results:
+        prompt_text = insufficient_info_response(response_lang)
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            text=prompt_text,
+            cards=[],
+            sources=[],
+            inference_time_ms=0,
+        )
+        db.add(assistant_message)
+        db.commit()
+        db.refresh(assistant_message)
+
+        response = MessageResponse.model_validate(assistant_message)
+        response.cards = []
+        response.sources = []
+        return response
+
+    context_docs, citations = _build_context_and_citations(relevant_results)
+    if not context_docs:
+        prompt_text = insufficient_info_response(response_lang)
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            text=prompt_text,
+            cards=[],
+            sources=[],
+            inference_time_ms=0,
+        )
+        db.add(assistant_message)
+        db.commit()
+        db.refresh(assistant_message)
+
+        response = MessageResponse.model_validate(assistant_message)
+        response.cards = []
+        response.sources = []
+        return response
+
     cards = []
     sources = []
-    
-    for result in search_results:
+    for result in relevant_results:
         payload = result["payload"]
-        context_docs.append(payload.get("text", ""))
-        
-        # Create card
         card = Card(
             type="document_snippet",
             doc_id=payload.get("doc_id"),
@@ -190,83 +338,36 @@ async def send_message(
             metadata=payload,
         )
         cards.append(card)
-        
-        # Add to sources
+
         sources.append({
             "document_id": payload.get("doc_id"),
             "document_title": payload.get("title", "Document"),
             "chunk_id": payload.get("chunk_id"),
-            "page_number": payload.get("page_number"),
+            "page_number": payload.get("page_number") or payload.get("page"),
             "similarity": result["score"],
         })
-    
-    # 3. Generate LLM response with multi-language support
-    if not context_docs:
-        # No relevant documents found
-        logger.warning(f"No relevant documents found for query: '{request.text[:50]}...'")
-        context_text = "No relevant documents found in the database."
-        no_context_message = "I don't have any relevant documents to answer your question. Please upload documents first or ask a different question."
-    else:
-        # Number each context document for better reference
-        numbered_context = []
-        for i, doc in enumerate(context_docs, 1):
-            numbered_context.append(f"[Document {i}]:\n{doc}")
-        context_text = "\n\n".join(numbered_context)
-        no_context_message = None
-    
-    # Detect if query is in Arabic or other RTL language
-    is_arabic = any('\u0600' <= char <= '\u06FF' for char in request.text)
-    
-    if no_context_message:
-        # No context available
-        if is_arabic:
-            assistant_text = "عذراً، لم أجد أي مستندات ذات صلة للإجابة على سؤالك. يرجى تحميل المستندات أولاً أو طرح سؤال مختلف."
-        else:
-            assistant_text = no_context_message
-    elif is_arabic:
-        system_prompt = """أنت مساعد ذكي متخصص في تحليل المستندات. قدم إجابات دقيقة ومفيدة باللغة العربية بناءً على المستندات المقدمة فقط.
 
-**مهم جداً**: يجب أن تجيب دائماً باللغة العربية فقط، بغض النظر عن لغة المستندات. جميع إجاباتك يجب أن تكون باللغة العربية."""
-        prompt = f"""المستندات المرجعية:
-{context_text}
+    context_text = "\n\n".join(context_docs)
+    language_instruction = "Respond in Arabic." if response_lang == "ar" else "Respond in English."
 
-سؤال المستخدم: {request.text}
-
-التعليمات:
-1. أجب بناءً على المعلومات الموجودة في المستندات المرجعية فقط
-2. إذا كانت المعلومات غير كافية، قل ذلك بوضوح
-3. اذكر رقم المستند عند الإشارة إلى معلومات محددة
-4. كن دقيقاً ومباشراً في إجابتك
-5. **يجب أن تكون الإجابة باللغة العربية فقط**
-
-الإجابة:"""
-        assistant_text = await ollama_service.generate_completion(
-            prompt=prompt,
-            system_prompt=system_prompt
-        )
-    else:
-        system_prompt = """You are an AI assistant specialized in document analysis. Provide accurate, helpful answers based ONLY on the provided context documents.
-
-**IMPORTANT**: Always respond in the SAME LANGUAGE as the user's question. If the question is in English, respond in English. If in another language, respond in that language."""
-        prompt = f"""Context documents:
+    prompt = f"""Context passages (use citations in brackets):
 {context_text}
 
 User question: {request.text}
 
 Instructions:
-1. Answer based ONLY on information in the context documents above
-2. If the context doesn't contain enough information, state that clearly
-3. Reference document numbers when citing specific information (e.g., "According to Document 1...")
-4. Be precise and direct in your answer
-5. If multiple documents are relevant, synthesize the information
-6. **Respond in the SAME LANGUAGE as the user's question (English)**
+- {language_instruction}
+- Use only the provided context passages.
+- If information is missing, say so and ask a precise follow-up question.
 
 Answer:"""
-        assistant_text = await ollama_service.generate_completion(
-            prompt=prompt,
-            system_prompt=system_prompt
-        )
-    
+
+    assistant_text = await ollama_service.generate_completion(
+        prompt=prompt,
+        system_prompt=SYSTEM_PROMPT,
+    )
+
+    assistant_text += _build_citations_output(citations, response_lang)
     inference_time = int((time.time() - start_time) * 1000)
     
     # Save assistant message
@@ -370,20 +471,64 @@ async def websocket_chat(
             db.add(user_message)
             db.commit()
             
+            user_text = message_data.get("text", "")
+            if not user_text.strip():
+                response_lang = detect_language(user_text) or "en"
+                prompt_text = empty_message_response(response_lang)
+                await websocket.send_json({"type": "token", "content": prompt_text})
+                await websocket.send_json({"type": "done"})
+                continue
+
+            explicit_lang = detect_explicit_language(user_text)
+            if not explicit_lang and is_ambiguous_language(user_text):
+                prompt_text = ambiguous_language_response()
+                await websocket.send_json({"type": "token", "content": prompt_text})
+                await websocket.send_json({"type": "done"})
+                continue
+
+            response_lang = explicit_lang or detect_language(user_text) or "en"
+
+            if is_greeting(user_text):
+                prompt_text = greeting_response(response_lang)
+                await websocket.send_json({"type": "token", "content": prompt_text})
+                await websocket.send_json({"type": "done"})
+                continue
+
+            if is_illegal_request(user_text):
+                prompt_text = illegal_request_response(response_lang)
+                await websocket.send_json({"type": "token", "content": prompt_text})
+                await websocket.send_json({"type": "done"})
+                continue
+
             # Generate streaming response
             qdrant_service = QdrantService()
             ollama_service = OllamaService()
-            
-            # Search for context
-            query_embedding = await ollama_service.generate_embedding(message_data["text"])
+
+            query_embedding = await ollama_service.generate_embedding(user_text)
             search_results = await qdrant_service.search(
                 query_vector=query_embedding,
                 limit=5,
-                score_threshold=0.5,
+                score_threshold=None,
             )
-            
-            # Send cards first
-            for result in search_results:
+
+            relevant_results = [
+                result for result in search_results if result["score"] >= settings.MIN_SIMILARITY
+            ]
+
+            if not relevant_results:
+                prompt_text = insufficient_info_response(response_lang)
+                await websocket.send_json({"type": "token", "content": prompt_text})
+                await websocket.send_json({"type": "done"})
+                continue
+
+            context_docs, citations = _build_context_and_citations(relevant_results)
+            if not context_docs:
+                prompt_text = insufficient_info_response(response_lang)
+                await websocket.send_json({"type": "token", "content": prompt_text})
+                await websocket.send_json({"type": "done"})
+                continue
+
+            for result in relevant_results:
                 payload = result["payload"]
                 card = {
                     "type": "card",
@@ -396,57 +541,34 @@ async def websocket_chat(
                     }
                 }
                 await websocket.send_json(card)
-            
-            # Build context and prompt with language detection
-            context_docs = [r["payload"].get("text", "") for r in search_results]
+
             context_text = "\n\n".join(context_docs)
-            
-            # Detect if query is in Arabic
-            user_text = message_data["text"]
-            is_arabic = any('\u0600' <= char <= '\u06FF' for char in user_text)
-            
-            if is_arabic:
-                system_prompt = """أنت مساعد ذكي متخصص في تحليل المستندات. قدم إجابات دقيقة ومفيدة باللغة العربية بناءً على المستندات المقدمة فقط.
+            language_instruction = "Respond in Arabic." if response_lang == "ar" else "Respond in English."
 
-**مهم جداً**: يجب أن تجيب دائماً باللغة العربية فقط، بغض النظر عن لغة المستندات. جميع إجاباتك يجب أن تكون باللغة العربية."""
-                prompt = f"""المستندات المرجعية:
-{context_text}
-
-سؤال المستخدم: {user_text}
-
-التعليمات:
-1. أجب بناءً على المعلومات الموجودة في المستندات المرجعية فقط
-2. إذا كانت المعلومات غير كافية، قل ذلك بوضوح
-3. كن دقيقاً ومباشراً في إجابتك
-4. **يجب أن تكون الإجابة باللغة العربية فقط**
-
-الإجابة:"""
-            else:
-                system_prompt = """You are an AI assistant specialized in document analysis. Provide accurate, helpful answers based ONLY on the provided context documents.
-
-**IMPORTANT**: Always respond in the SAME LANGUAGE as the user's question. If the question is in English, respond in English."""
-                prompt = f"""Context documents:
+            prompt = f"""Context passages (use citations in brackets):
 {context_text}
 
 User question: {user_text}
 
 Instructions:
-1. Answer based ONLY on information in the context documents above
-2. If the context doesn't contain enough information, state that clearly
-3. Be precise and direct in your answer
-4. **Respond in the SAME LANGUAGE as the user's question (English)**
+- {language_instruction}
+- Use only the provided context passages.
+- If information is missing, say so and ask a precise follow-up question.
 
 Answer:"""
-            
-            # Stream tokens with system prompt
+
             full_response = ""
-            async for token in ollama_service.generate_completion_stream(prompt, system_prompt=system_prompt):
+            async for token in ollama_service.generate_completion_stream(prompt, system_prompt=SYSTEM_PROMPT):
                 await websocket.send_json({"type": "token", "content": token})
                 full_response += token
-            
+
+            citations_output = _build_citations_output(citations, response_lang)
+            if citations_output:
+                await websocket.send_json({"type": "token", "content": citations_output})
+                full_response += citations_output
+
             # Send done signal
             await websocket.send_json({"type": "done"})
-            
             # Save assistant message
             assistant_message = Message(
                 conversation_id=conversation.id,
