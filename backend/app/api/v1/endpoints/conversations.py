@@ -41,39 +41,15 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-def _format_citation(payload: dict, fallback_id: str) -> str:
-    doc_name = payload.get("title") or payload.get("doc_title") or payload.get("doc_name") or "Document"
-    page = payload.get("page_number") or payload.get("page")
-    if page is not None:
-        return f"(Doc: {doc_name}, p.{page})"
-    chunk_id = payload.get("chunk_id") or fallback_id
-    return f"(Doc: {doc_name}, chunk {chunk_id})"
-
-
-def _build_context_and_citations(results: List[dict]) -> tuple[list[str], list[str]]:
+def _build_context(results: List[dict]) -> list[str]:
     context_docs = []
-    citations = []
     for result in results:
         payload = result.get("payload") or {}
         text = payload.get("text", "")
         if not text:
             continue
-        citation = _format_citation(payload, result.get("id", "unknown"))
-        context_docs.append(f"[{citation}] {text}")
-        citations.append(citation)
-    unique_citations = []
-    for citation in citations:
-        if citation not in unique_citations:
-            unique_citations.append(citation)
-    return context_docs, unique_citations
-
-
-def _build_citations_output(citations: List[str], lang: str) -> str:
-    if not citations:
-        return ""
-    label = "\u0627\u0644\u0645\u0635\u0627\u062f\u0631" if lang == "ar" else "Sources"
-    lines = "\n".join(f"- {citation}" for citation in citations)
-    return f"\n\n{label}:\n{lines}"
+        context_docs.append(text)
+    return context_docs
 
 
 
@@ -305,7 +281,7 @@ async def send_message(
         response.sources = []
         return response
 
-    context_docs, citations = _build_context_and_citations(relevant_results)
+    context_docs = _build_context(relevant_results)
     if not context_docs:
         prompt_text = insufficient_info_response(response_lang)
         assistant_message = Message(
@@ -350,7 +326,7 @@ async def send_message(
     context_text = "\n\n".join(context_docs)
     language_instruction = "Respond in Arabic." if response_lang == "ar" else "Respond in English."
 
-    prompt = f"""Context passages (use citations in brackets):
+    prompt = f"""Context passages:
 {context_text}
 
 User question: {request.text}
@@ -367,7 +343,6 @@ Answer:"""
         system_prompt=SYSTEM_PROMPT,
     )
 
-    assistant_text += _build_citations_output(citations, response_lang)
     inference_time = int((time.time() - start_time) * 1000)
     
     # Save assistant message
@@ -521,7 +496,7 @@ async def websocket_chat(
                 await websocket.send_json({"type": "done"})
                 continue
 
-            context_docs, citations = _build_context_and_citations(relevant_results)
+            context_docs = _build_context(relevant_results)
             if not context_docs:
                 prompt_text = insufficient_info_response(response_lang)
                 await websocket.send_json({"type": "token", "content": prompt_text})
@@ -545,7 +520,7 @@ async def websocket_chat(
             context_text = "\n\n".join(context_docs)
             language_instruction = "Respond in Arabic." if response_lang == "ar" else "Respond in English."
 
-            prompt = f"""Context passages (use citations in brackets):
+            prompt = f"""Context passages:
 {context_text}
 
 User question: {user_text}
@@ -561,11 +536,6 @@ Answer:"""
             async for token in ollama_service.generate_completion_stream(prompt, system_prompt=SYSTEM_PROMPT):
                 await websocket.send_json({"type": "token", "content": token})
                 full_response += token
-
-            citations_output = _build_citations_output(citations, response_lang)
-            if citations_output:
-                await websocket.send_json({"type": "token", "content": citations_output})
-                full_response += citations_output
 
             # Send done signal
             await websocket.send_json({"type": "done"})

@@ -15,9 +15,46 @@ class OllamaService:
     
     def __init__(self):
         self.base_url = settings.OLLAMA_BASE_URL
+        self.embedding_base_url = settings.OLLAMA_BASE_URL
         self.model = settings.OLLAMA_MODEL
         self.embedding_model = settings.OLLAMA_EMBEDDING_MODEL
+        self.use_vllm = settings.VLLM_ENABLED or settings.EMBEDDING_MODEL_TYPE in (
+            "vllm",
+            "openai-compatible",
+        )
+        if self.use_vllm and settings.VLLM_BASE_URL:
+            self.base_url = settings.VLLM_BASE_URL
+            self.embedding_base_url = settings.VLLM_EMBEDDING_BASE_URL or settings.VLLM_BASE_URL
+            if settings.VLLM_MODEL:
+                self.model = settings.VLLM_MODEL
+            if settings.EMBEDDING_MODEL_NAME:
+                self.embedding_model = settings.EMBEDDING_MODEL_NAME
         self.timeout = settings.OLLAMA_TIMEOUT
+
+    def _auth_headers(self) -> Dict[str, str]:
+        if self.use_vllm and settings.VLLM_API_KEY:
+            return {"Authorization": f"Bearer {settings.VLLM_API_KEY}"}
+        return {}
+
+    def _iter_openai_stream(self, lines: List[str]) -> List[str]:
+        tokens: List[str] = []
+        for line in lines:
+            if not line.startswith("data:"):
+                continue
+            payload = line[len("data:"):].strip()
+            if payload == "[DONE]":
+                continue
+            try:
+                chunk = json.loads(payload)
+                choices = chunk.get("choices", [])
+                if choices:
+                    delta = choices[0].get("delta", {})
+                    content = delta.get("content")
+                    if content:
+                        tokens.append(content)
+            except json.JSONDecodeError:
+                continue
+        return tokens
     
     async def generate_completion(
         self,
@@ -47,6 +84,7 @@ class OllamaService:
                 response = await client.post(
                     f"{self.base_url}/api/generate",
                     json=generate_payload,
+                    headers=self._auth_headers(),
                 )
                 if response.status_code == 404:
                     last_error = response
@@ -63,6 +101,7 @@ class OllamaService:
                     response = await client.post(
                         f"{self.base_url}/api/chat",
                         json=chat_payload,
+                        headers=self._auth_headers(),
                     )
                     if response.status_code == 404:
                         last_error = response
@@ -74,6 +113,7 @@ class OllamaService:
                         response = await client.post(
                             f"{self.base_url}/v1/chat/completions",
                             json=oa_payload,
+                            headers=self._auth_headers(),
                         )
                         if response.status_code == 404 and last_error is not None:
                             last_error.raise_for_status()
@@ -120,6 +160,7 @@ class OllamaService:
                     "POST",
                     f"{self.base_url}/api/generate",
                     json=generate_payload,
+                    headers=self._auth_headers(),
                 ) as response:
                     if response.status_code == 404:
                         chat_messages = []
@@ -136,7 +177,27 @@ class OllamaService:
                             "POST",
                             f"{self.base_url}/api/chat",
                             json=chat_payload,
+                            headers=self._auth_headers(),
                         ) as chat_response:
+                            if chat_response.status_code == 404:
+                                oa_payload = {
+                                    "model": self.model,
+                                    "messages": chat_messages,
+                                    "stream": True,
+                                }
+                                async with client.stream(
+                                    "POST",
+                                    f"{self.base_url}/v1/chat/completions",
+                                    json=oa_payload,
+                                    headers=self._auth_headers(),
+                                ) as oa_response:
+                                    oa_response.raise_for_status()
+                                    async for line in oa_response.aiter_lines():
+                                        if line.strip():
+                                            for token in self._iter_openai_stream([line]):
+                                                yield token
+                                return
+
                             chat_response.raise_for_status()
                             async for line in chat_response.aiter_lines():
                                 if line.strip():
@@ -210,7 +271,11 @@ class OllamaService:
                     ("/v1/embeddings", {"model": self.embedding_model, "input": text}),
                 )
                 for endpoint, payload in endpoints:
-                    response = await client.post(f"{self.base_url}{endpoint}", json=payload)
+                    response = await client.post(
+                        f"{self.embedding_base_url}{endpoint}",
+                        json=payload,
+                        headers=self._auth_headers(),
+                    )
                     if response.status_code == 404:
                         last_error = response
                         continue

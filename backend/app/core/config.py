@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     # Production Inference (vLLM)
     VLLM_ENABLED: bool = False
     VLLM_BASE_URL: Optional[str] = None
+    VLLM_EMBEDDING_BASE_URL: Optional[str] = None
     VLLM_MODEL: Optional[str] = None
     VLLM_API_KEY: Optional[str] = None
     
