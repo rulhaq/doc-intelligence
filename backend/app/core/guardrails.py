@@ -21,6 +21,7 @@ _AR_GREETING_PATTERNS = {
     "أهلاً",
     "اهلا",
     "السلام عليكم",
+    "السلام عليكم ورحمة الله",
     "صباح الخير",
     "مساء الخير",
 }
@@ -41,17 +42,17 @@ _ILLEGAL_EN = [
 ]
 
 _ILLEGAL_AR = [
-    "تزوير",
-    "تلفيق",
-    "فبركة",
+    "تزوير الأدلة",
+    "تلفيق الأدلة",
+    "فبركة الأدلة",
+    "زرع الأدلة",
     "إتلاف الأدلة",
     "إخفاء الأدلة",
-    "تغيير الأدلة",
     "ترهيب الشهود",
     "تهديد الشهود",
     "رشوة",
+    "تغيير السجلات",
     "تزوير المستندات",
-    "تعديل السجلات",
 ]
 
 _LANGUAGE_HINTS_EN = re.compile(
@@ -59,7 +60,11 @@ _LANGUAGE_HINTS_EN = re.compile(
     re.IGNORECASE,
 )
 _LANGUAGE_HINTS_AR = re.compile(
-    r"(بالعربية|باللغة العربية|بالانجليزية|بالإنجليزية|باللغة الانجليزية)",
+    r"(باللغة العربية|بالعربية|باللغة العربيّة|عربي|بالعربي)",
+    re.IGNORECASE,
+)
+_LANGUAGE_HINTS_AR_EN = re.compile(
+    r"\b(in arabic|arabic please|respond in arabic|answer in arabic)\b",
     re.IGNORECASE,
 )
 
@@ -72,7 +77,7 @@ def _count_lang_chars(text: str) -> Tuple[int, int]:
 
 def detect_explicit_language(text: str) -> Optional[str]:
     """Return 'ar', 'en', or None if no explicit preference detected."""
-    if _LANGUAGE_HINTS_AR.search(text):
+    if _LANGUAGE_HINTS_AR.search(text) or _LANGUAGE_HINTS_AR_EN.search(text):
         return "ar"
     if _LANGUAGE_HINTS_EN.search(text):
         return "en"
@@ -128,15 +133,15 @@ def is_illegal_request(text: str) -> bool:
 
 def greeting_response(lang: str) -> str:
     if lang == "ar":
-        return "مرحباً! أنا هنا للمساعدة في أسئلة ملف القضية. ما الذي تريد معرفته؟"
+        return "مرحباً! أنا هنا للمساعدة في أسئلة ملف القضية. ماذا تريد أن تعرف؟"
     return "Hello! I'm here to help with questions about the case file. What would you like to know?"
 
 
 def illegal_request_response(lang: str) -> str:
     if lang == "ar":
         return (
-            "لا يمكنني المساعدة في أي طلب غير قانوني أو غير أخلاقي. "
-            "يمكنني بدلاً من ذلك توضيح الإجراءات القانونية الصحيحة أو أفضل ممارسات حفظ الأدلة."
+            "لا أستطيع المساعدة في طلبات غير قانونية أو غير أخلاقية. "
+            "يمكنني المساعدة في الإجراءات القانونية السليمة أو أفضل ممارسات التعامل مع الأدلة."
         )
     return (
         "I can't assist with illegal or unethical requests. "
@@ -147,8 +152,8 @@ def illegal_request_response(lang: str) -> str:
 def insufficient_info_response(lang: str) -> str:
     if lang == "ar":
         return (
-            "لا أملك معلومات كافية في ملف القضية للإجابة بشكل موثوق. "
-            "هل يمكنك تحديد المستند أو الصفحة أو الكلمات المفتاحية ذات الصلة؟"
+            "لا توجد معلومات كافية في ملف القضية للإجابة بشكل موثوق. "
+            "هل يمكنك تحديد الوثيقة أو رقم الصفحة أو الكلمات المفتاحية؟"
         )
     return (
         "I don't have enough information in the case file to answer reliably. "
@@ -157,10 +162,10 @@ def insufficient_info_response(lang: str) -> str:
 
 
 def ambiguous_language_response() -> str:
-    return "Do you prefer Arabic or English for the response؟"
+    return "Do you prefer Arabic or English for the response? / هل تفضل العربية أم الإنجليزية للإجابة؟"
 
 
 def empty_message_response(lang: str) -> str:
     if lang == "ar":
-        return "يرجى كتابة سؤال واضح حول ملف القضية."
+        return "يرجى إدخال سؤال واضح عن ملف القضية."
     return "Please enter a clear question about the case file."

@@ -23,16 +23,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application
 COPY . .
 
-# Create temp directory
-RUN mkdir -p /tmp/ocr
-
-# Expose port
-EXPOSE 8001
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8001/health || exit 1
+# Create non-root user and temp directory
+RUN groupadd --system app && useradd --system --gid app --home /app app && \
+    mkdir -p /tmp/ocr /data && chown -R app:app /app /tmp/ocr /data
 
 # Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+USER app
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${OCR_WORKER_PORT}"]
 

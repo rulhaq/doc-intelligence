@@ -1,7 +1,6 @@
 import api from '../lib/api'
 import axios from 'axios'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_URL } from '../lib/config'
 
 interface LoginRequest {
   username: string
@@ -29,13 +28,11 @@ interface UserResponse {
 
 export const authService = {
   async login(data: LoginRequest): Promise<{ tokens: LoginResponse; user: UserResponse }> {
-    // Login endpoint doesn't need auth, use axios directly
     const response = await axios.post<LoginResponse>(
       `${API_URL}/api/v1/auth/local/login`,
       data
     )
-    
-    // Get user info with the token
+
     const userResponse = await axios.get<UserResponse>(
       `${API_URL}/api/v1/auth/me`,
       {
@@ -44,7 +41,7 @@ export const authService = {
         },
       }
     )
-    
+
     return {
       tokens: response.data,
       user: userResponse.data,
@@ -77,4 +74,3 @@ export const authService = {
     return response.data
   },
 }
-

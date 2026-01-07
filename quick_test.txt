@@ -1,7 +1,0 @@
-﻿CONTRACT SUMMARY
-
-Client: ABC Corp
-Value: 250000 USD
-Duration: 12 months
-Services: IT consulting
-Start Date: January 1, 2025

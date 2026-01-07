@@ -38,7 +38,7 @@ class SystemStatsResponse(BaseModel):
     total_conversations: int
     total_vectors: int
     storage_used_bytes: int
-    ollama_status: str
+    vllm_status: str
     qdrant_status: str
     available_models: List[str]
 
@@ -199,24 +199,30 @@ async def get_system_stats(
         logger.error("Failed to get Qdrant stats", error=str(e))
         qdrant_status = "unreachable"
     
-    # Get Ollama models
+    # Get vLLM models
     available_models = []
-    ollama_status = "unknown"
+    vllm_status = "unknown"
     try:
+        base_url = settings.VLLM_BASE_URL.rstrip("/")
+        if base_url.endswith("/v1"):
+            base_url = base_url[:-3]
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
+            response = await client.get(
+                f"{base_url}/v1/models",
+                headers={"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"},
+            )
             if response.status_code == 200:
                 data = response.json()
-                available_models = [model["name"] for model in data.get("models", [])]
-                ollama_status = "healthy"
+                available_models = [model["id"] for model in data.get("data", [])]
+                vllm_status = "healthy"
             else:
-                ollama_status = "error"
+                vllm_status = "error"
     except Exception as e:
-        logger.error("Failed to get Ollama models", error=str(e))
-        ollama_status = "unreachable"
+        logger.error("Failed to get vLLM models", error=str(e))
+        vllm_status = "unreachable"
     
-    # Get storage stats (simplified - you'd integrate with MinIO properly)
-    storage_used_bytes = 0  # Placeholder - implement MinIO stats if needed
+    # Get storage stats (simplified - integrate with object storage if needed)
+    storage_used_bytes = 0  # Placeholder - implement object storage stats if needed
     
     return SystemStatsResponse(
         total_users=total_users,
@@ -224,36 +230,35 @@ async def get_system_stats(
         total_conversations=total_conversations,
         total_vectors=total_vectors,
         storage_used_bytes=storage_used_bytes,
-        ollama_status=ollama_status,
+        vllm_status=vllm_status,
         qdrant_status=qdrant_status,
         available_models=available_models,
     )
 
 
 # Available LLM Models
-@router.get("/ollama/models")
-async def get_ollama_models(
+@router.get("/vllm/models")
+async def get_vllm_models(
     current_user: User = Depends(require_role("admin")),
 ):
-    """Get list of available Ollama models"""
+    """Get list of available vLLM models"""
     try:
+        base_url = settings.VLLM_BASE_URL.rstrip("/")
+        if base_url.endswith("/v1"):
+            base_url = base_url[:-3]
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
+            response = await client.get(
+                f"{base_url}/v1/models",
+                headers={"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"},
+            )
             if response.status_code == 200:
                 data = response.json()
-                models = []
-                for model in data.get("models", []):
-                    models.append({
-                        "name": model["name"],
-                        "size": model.get("size", 0),
-                        "modified_at": model.get("modified_at", ""),
-                        "details": model.get("details", {}),
-                    })
+                models = [{"name": model.get("id")} for model in data.get("data", [])]
                 return {"models": models, "status": "healthy"}
             else:
                 return {"models": [], "status": "error", "message": "Failed to fetch models"}
     except Exception as e:
-        logger.error("Failed to get Ollama models", error=str(e))
+        logger.error("Failed to get vLLM models", error=str(e))
         return {"models": [], "status": "unreachable", "message": str(e)}
 
 
@@ -265,13 +270,19 @@ async def get_system_health(
     """Check health of all services"""
     services = {}
     
-    # Check Ollama
+    # Check vLLM
     try:
+        base_url = settings.VLLM_BASE_URL.rstrip("/")
+        if base_url.endswith("/v1"):
+            base_url = base_url[:-3]
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
-            services["ollama"] = "healthy" if response.status_code == 200 else "error"
+            response = await client.get(
+                f"{base_url}/v1/models",
+                headers={"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"},
+            )
+            services["vllm"] = "healthy" if response.status_code == 200 else "error"
     except:
-        services["ollama"] = "unreachable"
+        services["vllm"] = "unreachable"
     
     # Check Qdrant
     try:

@@ -16,10 +16,10 @@ class GuardrailTests(unittest.TestCase):
 
     def test_greeting_arabic_shortcuts(self):
         self.assertTrue(is_greeting("مرحبا"))
-        self.assertIn("مرحب", greeting_response("ar"))
+        self.assertIn("مرحباً", greeting_response("ar"))
 
     def test_language_detection_arabic(self):
-        self.assertEqual(detect_language("ما هي تفاصيل القضية؟"), "ar")
+        self.assertEqual(detect_language("هل يمكنك تلخيص الوقائع؟"), "ar")
 
     def test_language_detection_english(self):
         self.assertEqual(detect_language("Summarize the case facts."), "en")

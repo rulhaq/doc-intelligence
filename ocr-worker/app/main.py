@@ -3,6 +3,7 @@ from fastapi import FastAPI, Response
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import structlog
+import os
 from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 from app.ocr_engine import OCREngine
@@ -85,6 +86,19 @@ async def health():
     return {"status": "healthy", "service": "ocr-worker"}
 
 
+@app.on_event("startup")
+async def validate_storage():
+    storage_path = os.getenv("FILE_STORAGE_PATH")
+    if not storage_path:
+        raise RuntimeError("FILE_STORAGE_PATH is required")
+
+
+@app.get("/ready")
+async def readiness():
+    """Readiness check"""
+    return {"ready": True}
+
+
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint"""
@@ -98,7 +112,10 @@ async def process_document(request: ProcessRequest):
     
     try:
         # Process with OCR engine
-        ocr_results = await ocr_engine.process_document(request.file_path)
+        ocr_results = await ocr_engine.process_document(
+            document_id=request.document_id,
+            file_path=request.file_path,
+        )
         
         # Correct with LLM if enabled
         pages = []
@@ -147,5 +164,10 @@ async def process_document(request: ProcessRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    import os
+    port_str = os.getenv("OCR_WORKER_PORT")
+    if not port_str:
+        raise RuntimeError("OCR_WORKER_PORT is required")
+    port = int(port_str)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 

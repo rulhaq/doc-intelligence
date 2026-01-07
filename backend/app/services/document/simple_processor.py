@@ -5,16 +5,12 @@ from pathlib import Path
 from pypdf import PdfReader
 from docx import Document
 import structlog
-from app.services.inference.ollama_service import OllamaService
 
 logger = structlog.get_logger()
 
 
 class SimpleDocumentProcessor:
     """Process documents directly - supports PDF, DOCX, TXT"""
-    
-    def __init__(self):
-        self.ollama = OllamaService()
     
     async def process_document(self, file_content: bytes, filename: str) -> Dict[str, Any]:
         """Process document based on file type"""

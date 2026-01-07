@@ -7,7 +7,7 @@ from app.core.security import get_current_active_user
 from app.models.user import User
 from app.schemas.search import SearchRequest, SearchResponse, SearchResult
 from app.services.vector.qdrant_service import QdrantService
-from app.services.inference.ollama_service import OllamaService
+from app.services.embeddings_service import embed_query
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -22,8 +22,7 @@ async def semantic_search(
     start_time = time.time()
     
     # Generate query embedding
-    ollama_service = OllamaService()
-    query_embedding = await ollama_service.generate_embedding(request.query)
+    query_embedding = await embed_query(request.query)
     
     # Search Qdrant
     qdrant_service = QdrantService()

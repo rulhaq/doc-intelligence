@@ -63,7 +63,7 @@ def embed_document_task(document_id: str):
     from app.core.database import SessionLocal
     from app.models.document import Document, DocumentPage, DocumentChunk, DocumentStatus
     from app.services.vector.qdrant_service import QdrantService
-    from app.services.inference.ollama_service import OllamaService
+    from app.services.embeddings_service import embed_query
     import hashlib
     from app.core.config import settings
     
@@ -78,7 +78,6 @@ def embed_document_task(document_id: str):
             DocumentPage.document_id == document_id
         ).all()
         
-        ollama_service = OllamaService()
         qdrant_service = QdrantService()
         
         points = []
@@ -96,8 +95,7 @@ def embed_document_task(document_id: str):
             for chunk_text in chunks:
                 # Generate embedding (synchronous version for Celery)
                 import asyncio
-                loop = asyncio.get_event_loop()
-                embedding = loop.run_until_complete(ollama_service.generate_embedding(chunk_text))
+                embedding = asyncio.run(embed_query(chunk_text))
                 
                 chunk_hash = hashlib.sha256(chunk_text.encode()).hexdigest()
                 chunk = DocumentChunk(
@@ -127,8 +125,8 @@ def embed_document_task(document_id: str):
         
         # Upsert to Qdrant
         if points:
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(qdrant_service.upsert_vectors(points))
+            import asyncio
+            asyncio.run(qdrant_service.upsert_vectors(points))
         
         document.status = DocumentStatus.COMMITTED
         db.commit()

@@ -5,8 +5,8 @@ import api from '../../lib/api'
 
 export default function SystemSettings() {
   const [settings, setSettings] = useState({
-    llm_model: 'jais:7b',
-    embedding_model: 'nomic-embed-text:latest',
+    llm_model: '',
+    embedding_model: '',
     chunk_size: 500,
     chunk_overlap: 50,
     max_tokens: 2000,
@@ -22,37 +22,33 @@ export default function SystemSettings() {
     loadAvailableModels()
   }, [])
 
-      const loadAvailableModels = async () => {
-        try {
-          const response = await api.get('/admin/ollama/models')
-          if (response.data.models) {
-            const modelNames = response.data.models.map((m: any) => m.name)
-            setAvailableModels(modelNames)
-            
-            // Set first model as default if none set
-            if (modelNames.length > 0 && !settings.llm_model) {
-              setSettings(prev => ({ ...prev, llm_model: modelNames[0] }))
-            }
-          } else {
-            // No models available
-            toast('No models downloaded in Ollama yet', { icon: '⚠️' })
-            setAvailableModels([])
-          }
-        } catch (error) {
-          console.error('Failed to load models:', error)
-          toast.error('Failed to connect to Ollama')
-          setAvailableModels([])
+  const loadAvailableModels = async () => {
+    try {
+      const response = await api.get('/admin/vllm/models')
+      if (response.data.models) {
+        const modelNames = response.data.models.map((m: any) => m.name)
+        setAvailableModels(modelNames)
+
+        if (modelNames.length > 0 && !settings.llm_model) {
+          setSettings(prev => ({ ...prev, llm_model: modelNames[0] }))
         }
+      } else {
+        toast('No models available in vLLM yet', { icon: '⚠️' })
+        setAvailableModels([])
       }
+    } catch (error) {
+      console.error('Failed to load models:', error)
+      toast.error('Failed to connect to vLLM')
+      setAvailableModels([])
+    }
+  }
 
   const handleSave = () => {
-    // In a real implementation, this would call an API to save settings
     toast.success('Settings saved successfully')
   }
 
   return (
     <div className="space-y-6">
-      {/* LLM Configuration */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-primary-100 rounded-lg">
@@ -87,15 +83,14 @@ export default function SystemSettings() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Embedding Model
             </label>
-            <select
+            <input
+              type="text"
               value={settings.embedding_model}
               onChange={(e) => setSettings({ ...settings, embedding_model: e.target.value })}
+              placeholder="Set via environment variables"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="nomic-embed-text:latest">nomic-embed-text:latest</option>
-              <option value="all-minilm:latest">all-minilm:latest</option>
-            </select>
-            <p className="mt-1 text-xs text-gray-500">Model used for document embeddings and RAG</p>
+            />
+            <p className="mt-1 text-xs text-gray-500">Managed by VLLM_EMBEDDING_MODEL</p>
           </div>
 
           <div>
@@ -155,7 +150,6 @@ export default function SystemSettings() {
         </div>
       </div>
 
-      {/* SSO Configuration */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-blue-100 rounded-lg">
@@ -168,7 +162,6 @@ export default function SystemSettings() {
         </div>
 
         <div className="space-y-6">
-          {/* Microsoft SSO */}
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -193,7 +186,7 @@ export default function SystemSettings() {
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
               </label>
             </div>
-            
+
             {settings.microsoft_sso && (
               <div className="space-y-3 pl-11">
                 <input
@@ -215,7 +208,6 @@ export default function SystemSettings() {
             )}
           </div>
 
-          {/* Google SSO */}
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -240,7 +232,7 @@ export default function SystemSettings() {
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
               </label>
             </div>
-            
+
             {settings.google_sso && (
               <div className="space-y-3 pl-11">
                 <input
@@ -259,7 +251,6 @@ export default function SystemSettings() {
         </div>
       </div>
 
-      {/* Performance Settings */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-green-100 rounded-lg">
@@ -298,7 +289,6 @@ export default function SystemSettings() {
         </div>
       </div>
 
-      {/* Save Button */}
       <div className="flex justify-end">
         <button
           onClick={handleSave}
@@ -310,4 +300,3 @@ export default function SystemSettings() {
     </div>
   )
 }
-

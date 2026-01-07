@@ -1,5 +1,5 @@
 """Storage Services"""
-from app.services.storage.minio_service import MinIOService
+from app.services.storage.file_storage import FileStorage
 
-__all__ = ["MinIOService"]
+__all__ = ["FileStorage"]
 

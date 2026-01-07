@@ -6,7 +6,6 @@ from pdf2image import convert_from_path
 from paddleocr import PaddleOCR
 import structlog
 import tempfile
-import uuid
 
 logger = structlog.get_logger()
 
@@ -27,6 +26,12 @@ class OCREngine:
         )
         
         self.confidence_threshold = float(os.getenv("OCR_CONFIDENCE_THRESHOLD", "0.5"))
+        storage_path = os.getenv("FILE_STORAGE_PATH")
+        if not storage_path:
+            raise RuntimeError("FILE_STORAGE_PATH is required")
+        self.storage_path = Path(storage_path)
+        self.images_dir = self.storage_path / "ocr_images"
+        self.images_dir.mkdir(parents=True, exist_ok=True)
         
         logger.info(
             "OCR engine initialized",
@@ -35,39 +40,50 @@ class OCREngine:
             threshold=self.confidence_threshold,
         )
     
-    async def process_document(self, file_path: str) -> Dict[str, Any]:
+    async def process_document(self, document_id: str, file_path: str) -> Dict[str, Any]:
         """
         Process document with OCR
         
         Args:
-            file_path: Path to PDF file in MinIO
+            document_id: Document ID
+            file_path: Path to PDF file in PVC storage
             
         Returns:
             OCR results with pages
         """
         logger.info("Processing document", file_path=file_path)
         
-        # Download file from MinIO (placeholder - implement MinIO download)
-        # For now, assume file_path is accessible
+        pdf_path = Path(file_path).resolve()
+        base_path = self.storage_path.resolve()
+        if not str(pdf_path).startswith(str(base_path)):
+            raise ValueError("Invalid file path")
+        if not pdf_path.exists():
+            raise FileNotFoundError(f"PDF not found: {pdf_path}")
         
         # Convert PDF to images
         temp_dir = Path(tempfile.mkdtemp())
+        output_dir = self.images_dir / document_id
+        output_dir.mkdir(parents=True, exist_ok=True)
         
         try:
-            # Note: In production, download from MinIO first
-            # For now, this is a placeholder structure
-            
-            # Simulate PDF conversion (replace with actual MinIO download + conversion)
             pages_data = []
-            
-            # Placeholder: Generate mock OCR results
-            # In production, this would:
-            # 1. Download PDF from MinIO
-            # 2. Convert pages to images
-            # 3. Run OCR on each page
-            # 4. Detect layout blocks
-            # 5. Return structured results
-            
+            images = convert_from_path(str(pdf_path), fmt="png", output_folder=str(temp_dir))
+
+            for index, image in enumerate(images, start=1):
+                image_path = output_dir / f"page_{index}.png"
+                image.save(image_path, "PNG")
+
+                ocr_result = await self.process_image(str(image_path))
+                pages_data.append({
+                    "page_number": index,
+                    "image_path": str(image_path),
+                    "ocr_text": ocr_result.get("text", ""),
+                    "ocr_blocks": ocr_result.get("blocks", []),
+                    "ocr_confidence": ocr_result.get("confidence", 0.0),
+                    "corrected_text": None,
+                    "corrections": None,
+                })
+
             logger.info("Document processing completed", pages=len(pages_data))
             
             return {

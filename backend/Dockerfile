@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
@@ -18,16 +17,12 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Create directories
-RUN mkdir -p /app/uploads /var/log/customerllm
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Create non-root user and required directories
+RUN groupadd --system app && useradd --system --gid app --home /app app && \
+    mkdir -p /data /var/log/customerllm && \
+    chown -R app:app /app /data /var/log/customerllm
 
 # Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+USER app
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --workers ${UVICORN_WORKERS:-4}"]
 

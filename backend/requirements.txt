@@ -17,8 +17,6 @@ celery==5.3.6
 # Qdrant
 qdrant-client==1.7.3
 
-# MinIO/S3
-minio==7.2.3
 
 # Auth
 python-jose[cryptography]==3.3.0
@@ -36,9 +34,6 @@ httpx==0.26.0
 beautifulsoup4==4.12.3
 lxml==5.1.0
 
-# LLM
-openai==1.10.0
-
 # PDF
 pypdf==4.0.1
 Pillow==10.2.0
@@ -50,7 +45,6 @@ pydantic-settings==2.1.0
 email-validator==2.1.0
 
 # Utilities
-python-dotenv==1.0.1
 aiofiles==23.2.1
 
 # Monitoring

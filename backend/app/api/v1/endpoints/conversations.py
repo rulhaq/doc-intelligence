@@ -34,7 +34,8 @@ from app.schemas.conversation import (
     Card,
 )
 from app.services.vector.qdrant_service import QdrantService
-from app.services.inference.ollama_service import OllamaService
+from app.services.inference.vllm_service import VLLMService
+from app.services.embeddings_service import embed_query
 from app.core.prompts import SYSTEM_PROMPT
 
 logger = structlog.get_logger()
@@ -50,6 +51,25 @@ def _build_context(results: List[dict]) -> list[str]:
             continue
         context_docs.append(text)
     return context_docs
+
+
+def _build_citations(results: List[dict]) -> str:
+    citations = []
+    seen = set()
+    for result in results:
+        payload = result.get("payload") or {}
+        name = payload.get("title") or payload.get("source") or payload.get("filename")
+        page = payload.get("page_number") or payload.get("page")
+        if not name or page is None:
+            continue
+        key = (name, page)
+        if key in seen:
+            continue
+        seen.add(key)
+        citations.append(f"(Doc: {name}, p.{page})")
+    if not citations:
+        return ""
+    return "Sources: " + " ".join(citations)
 
 
 
@@ -238,10 +258,10 @@ async def send_message(
     
     # 1. Search for relevant documents
     qdrant_service = QdrantService()
-    ollama_service = OllamaService()
+    vllm_service = VLLMService()
     
     # Generate query embedding
-    query_embedding = await ollama_service.generate_embedding(request.text)
+    query_embedding = await embed_query(request.text)
     
     # Search Qdrant with better parameters
     search_filters = {}
@@ -257,6 +277,25 @@ async def send_message(
     )
 
     logger.info(f"RAG Search: Found {len(search_results)} results for query: '{request.text[:50]}...'")
+
+    if not search_results or max(r["score"] for r in search_results) < settings.MIN_SIMILARITY:
+        prompt_text = insufficient_info_response(response_lang)
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            text=prompt_text,
+            cards=[],
+            sources=[],
+            inference_time_ms=0,
+        )
+        db.add(assistant_message)
+        db.commit()
+        db.refresh(assistant_message)
+
+        response = MessageResponse.model_validate(assistant_message)
+        response.cards = []
+        response.sources = []
+        return response
 
     relevant_results = [
         result for result in search_results if result["score"] >= settings.MIN_SIMILARITY
@@ -338,10 +377,13 @@ Instructions:
 
 Answer:"""
 
-    assistant_text = await ollama_service.generate_completion(
+    assistant_text = await vllm_service.generate_completion(
         prompt=prompt,
         system_prompt=SYSTEM_PROMPT,
     )
+    citations_text = _build_citations(relevant_results)
+    if citations_text:
+        assistant_text = f"{assistant_text}\n\n{citations_text}"
 
     inference_time = int((time.time() - start_time) * 1000)
     
@@ -477,14 +519,20 @@ async def websocket_chat(
 
             # Generate streaming response
             qdrant_service = QdrantService()
-            ollama_service = OllamaService()
+            vllm_service = VLLMService()
 
-            query_embedding = await ollama_service.generate_embedding(user_text)
+            query_embedding = await embed_query(user_text)
             search_results = await qdrant_service.search(
                 query_vector=query_embedding,
                 limit=5,
                 score_threshold=None,
             )
+
+            if not search_results or max(r["score"] for r in search_results) < settings.MIN_SIMILARITY:
+                prompt_text = insufficient_info_response(response_lang)
+                await websocket.send_json({"type": "token", "content": prompt_text})
+                await websocket.send_json({"type": "done"})
+                continue
 
             relevant_results = [
                 result for result in search_results if result["score"] >= settings.MIN_SIMILARITY
@@ -533,11 +581,15 @@ Instructions:
 Answer:"""
 
             full_response = ""
-            async for token in ollama_service.generate_completion_stream(prompt, system_prompt=SYSTEM_PROMPT):
+            async for token in vllm_service.generate_completion_stream(prompt, system_prompt=SYSTEM_PROMPT):
                 await websocket.send_json({"type": "token", "content": token})
                 full_response += token
 
-            # Send done signal
+            citations_text = _build_citations(relevant_results)
+            if citations_text:
+                await websocket.send_json({"type": "token", "content": f"\n\n{citations_text}"})
+                full_response = f"{full_response}\n\n{citations_text}"
+
             await websocket.send_json({"type": "done"})
             # Save assistant message
             assistant_message = Message(

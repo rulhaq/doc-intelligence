@@ -1,8 +1,10 @@
 """Application Configuration"""
 from typing import List, Optional
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings
+import structlog
 
+logger = structlog.get_logger()
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -10,15 +12,15 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "CustomerLLM"
     APP_VERSION: str = "1.0.0"
-    APP_ENV: str = "development"
-    DEBUG: bool = True
+    APP_ENV: str
+    DEBUG: bool
     API_VERSION: str = "v1"
     
     # Backend
     BACKEND_HOST: str = "0.0.0.0"
-    BACKEND_PORT: int = 8000
-    BACKEND_URL: str = "http://localhost:8000"
-    FRONTEND_URL: str = "http://localhost:3000"
+    BACKEND_PORT: int
+    BACKEND_URL: str
+    FRONTEND_URL: str
     
     # Database
     DATABASE_URL: str
@@ -36,29 +38,25 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION_NAME: str = "documents"
     QDRANT_TIMEOUT: int = 60
     
-    # Object Storage (MinIO/S3)
-    S3_ENDPOINT: str
-    S3_ACCESS_KEY: str
-    S3_SECRET_KEY: str
-    S3_BUCKET: str = "customerllm"
-    S3_SECURE: bool = False
+    # File Storage (PVC)
+    STORAGE_MODE: str
+    FILE_STORAGE_PATH: str
     
-    # Ollama (MVP Inference)
-    OLLAMA_BASE_URL: str
-    OLLAMA_MODEL: str = "jais:7b"
-    OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text:latest"
-    OLLAMA_TIMEOUT: int = 300
-    
-    # Production Inference (vLLM)
-    VLLM_ENABLED: bool = False
-    VLLM_BASE_URL: Optional[str] = None
+    # vLLM OpenAI-compatible inference (chat)
+    VLLM_BASE_URL: str
+    VLLM_MODEL: str
     VLLM_EMBEDDING_BASE_URL: Optional[str] = None
-    VLLM_MODEL: Optional[str] = None
-    VLLM_API_KEY: Optional[str] = None
+    VLLM_EMBEDDING_MODEL: Optional[str] = None
+    VLLM_API_TOKEN: str
+    VLLM_TIMEOUT: int = 300
+
+    # Embeddings provider
+    EMBEDDINGS_PROVIDER: str
+    TEI_BASE_URL: Optional[str] = None
+    TEI_API_TOKEN: Optional[str] = None
+    TEI_TIMEOUT: int = 60
     
     # Embedding Configuration
-    EMBEDDING_MODEL_TYPE: str = "ollama"  # ollama, vllm, openai-compatible
-    EMBEDDING_MODEL_NAME: str = "nomic-embed-text:latest"
     EMBEDDING_DIMENSION: int = 768
     EMBEDDING_BATCH_SIZE: int = 32
     MIN_SIMILARITY: float = 0.72
@@ -97,8 +95,6 @@ class Settings(BaseSettings):
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 100
     ALLOWED_EXTENSIONS: str = Field(default="pdf,docx,txt")
-    UPLOAD_DIR: str = "/app/uploads"
-    TEMP_DIR: str = "/tmp/customerllm"
     
     def get_allowed_extensions_list(self) -> List[str]:
         """Parse ALLOWED_EXTENSIONS string into list"""
@@ -123,13 +119,31 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_HOUR: int = 1000
     
     # CORS (stored as string, parsed to list in method)
-    CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:5173")
+    CORS_ORIGINS: str
     
     def get_cors_origins_list(self) -> List[str]:
         """Parse CORS_ORIGINS string into list"""
         if isinstance(self.CORS_ORIGINS, str):
             return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
         return self.CORS_ORIGINS
+
+    @field_validator("EMBEDDINGS_PROVIDER")
+    @classmethod
+    def _validate_provider(cls, value: str):
+        provider = value.lower()
+        if provider not in ("vllm", "tei"):
+            raise ValueError("EMBEDDINGS_PROVIDER must be 'vllm' or 'tei'")
+        return provider
+
+    @model_validator(mode="after")
+    def _validate_embeddings_settings(self):
+        if self.EMBEDDINGS_PROVIDER == "tei":
+            if not self.TEI_BASE_URL:
+                raise ValueError("TEI_BASE_URL must be set when EMBEDDINGS_PROVIDER=tei")
+        if self.EMBEDDINGS_PROVIDER == "vllm":
+            if not self.VLLM_EMBEDDING_BASE_URL or not self.VLLM_EMBEDDING_MODEL:
+                raise ValueError("VLLM_EMBEDDING_BASE_URL and VLLM_EMBEDDING_MODEL are required when EMBEDDINGS_PROVIDER=vllm")
+        return self
     
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -149,8 +163,30 @@ class Settings(BaseSettings):
     FEATURE_EXTERNAL_CONNECTORS: bool = True
     FEATURE_MULTIMODAL: bool = False
     
+    @field_validator(
+        "APP_ENV",
+        "BACKEND_URL",
+        "FRONTEND_URL",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "QDRANT_URL",
+        "STORAGE_MODE",
+        "FILE_STORAGE_PATH",
+        "VLLM_BASE_URL",
+        "VLLM_MODEL",
+        "VLLM_API_TOKEN",
+        "EMBEDDINGS_PROVIDER",
+        "OCR_WORKER_URL",
+        "SECRET_KEY",
+        "CORS_ORIGINS",
+    )
+    @classmethod
+    def _require_non_empty(cls, value: str, info):
+        if value is None or (isinstance(value, str) and not value.strip()):
+            raise ValueError(f"{info.field_name} must be set")
+        return value
+
     model_config = {
-        "env_file": ".env",
         "case_sensitive": True,
         "env_parse_none_str": None,
         "json_schema_extra": {
@@ -159,5 +195,22 @@ class Settings(BaseSettings):
     }
 
 
-settings = Settings()
+def load_settings() -> Settings:
+    """Load settings and log missing environment variables before failing."""
+    try:
+        return Settings()
+    except ValidationError as exc:
+        missing = [
+            ".".join(str(part) for part in err.get("loc", []))
+            for err in exc.errors()
+            if err.get("type") in ("missing", "value_error")
+        ]
+        if missing:
+            logger.error("Missing required environment variables", missing=missing)
+        else:
+            logger.error("Invalid environment configuration", errors=exc.errors())
+        raise
+
+
+settings = load_settings()
 

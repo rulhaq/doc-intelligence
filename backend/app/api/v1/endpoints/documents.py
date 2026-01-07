@@ -5,6 +5,7 @@ import uuid
 import hashlib
 from pathlib import Path
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import structlog
 
@@ -23,7 +24,7 @@ from app.schemas.document import (
     DocumentResponse,
     DocumentListResponse,
 )
-from app.services.storage.minio_service import MinIOService
+from app.services.storage.file_storage import FileStorage
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -171,23 +172,17 @@ async def upload_document(
     # Generate unique filename
     file_hash = hashlib.sha256(content).hexdigest()[:16]
     unique_filename = f"{uuid.uuid4()}_{file_hash}.{file_ext}"
-    object_path = f"documents/{unique_filename}"
-    
-    # Upload to MinIO
-    minio_service = MinIOService()
+    # Upload to PVC storage
+    storage = FileStorage()
     from io import BytesIO
-    await minio_service.upload_file(
-        file=BytesIO(content),
-        object_name=object_path,
-        content_type=file.content_type,
-    )
+    stored_path = storage.save_upload(BytesIO(content), file.filename)
     
     # Create document record
     document = Document(
         user_id=current_user.id,
         filename=unique_filename,
         original_filename=file.filename,
-        file_path=object_path,
+        file_path=stored_path,
         file_size=file_size,
         mime_type=file.content_type or "application/pdf",
         status=DocumentStatus.UPLOADED,
@@ -258,14 +253,14 @@ async def get_document_preview(
         DocumentPage.document_id == document_id
     ).order_by(DocumentPage.page_number).all()
     
-    # Generate presigned URLs for images
-    minio_service = MinIOService()
+    # Generate image URLs served by backend
+    base_url = settings.BACKEND_URL.rstrip("/")
     page_previews = []
     
     for page in pages:
         image_url = ""
         if page.image_path:
-            image_url = await minio_service.get_file_url(page.image_path)
+            image_url = f"{base_url}/api/{settings.API_VERSION}/documents/{document_id}/pages/{page.page_number}/image"
         
         page_preview = PagePreview(
             page_number=page.page_number,
@@ -343,7 +338,7 @@ async def commit_document(
     # Background task to chunk, embed, and upsert
     async def commit_task():
         from app.services.vector.qdrant_service import QdrantService
-        from app.services.inference.ollama_service import OllamaService
+        from app.services.embeddings_service import embed_query
         from app.core.database import SessionLocal
         import hashlib
         
@@ -366,7 +361,6 @@ async def commit_document(
             ).all()
             
             # Chunk and embed
-            ollama_service = OllamaService()
             qdrant_service = QdrantService()
             
             points = []
@@ -379,7 +373,7 @@ async def commit_document(
                 
                 for chunk_text in chunks:
                     # Generate embedding
-                    embedding = await ollama_service.generate_embedding(chunk_text)
+                    embedding = await embed_query(chunk_text)
                     
                     # Create chunk record
                     chunk_hash = hashlib.sha256(chunk_text.encode()).hexdigest()
@@ -424,7 +418,7 @@ async def commit_document(
                     
                     for chunk_text in chunks:
                         # Generate embedding
-                        embedding = await ollama_service.generate_embedding(chunk_text)
+                        embedding = await embed_query(chunk_text)
                         
                         # Create chunk record
                         chunk_hash = hashlib.sha256(chunk_text.encode()).hexdigest()
@@ -525,6 +519,28 @@ async def list_documents(
     )
 
 
+@router.get("/{document_id}/pages/{page_number}/image")
+async def get_page_image(
+    document_id: UUID,
+    page_number: int,
+    current_user: User = Depends(require_role("viewer")),
+    db: Session = Depends(get_db),
+):
+    """Serve OCR page image from PVC storage."""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise NotFoundException("Document not found")
+
+    page = db.query(DocumentPage).filter(
+        DocumentPage.document_id == document_id,
+        DocumentPage.page_number == page_number,
+    ).first()
+    if not page or not page.image_path:
+        raise NotFoundException("Page image not found")
+
+    return FileResponse(page.image_path)
+
+
 @router.post("/{document_id}/corrected-text")
 async def save_corrected_text(
     document_id: UUID,
@@ -580,10 +596,9 @@ async def delete_document(
     qdrant_service = QdrantService()
     await qdrant_service.delete_by_doc_id(str(document_id))
     
-    # Delete from MinIO
-    from app.services.storage.minio_service import MinIOService
-    minio_service = MinIOService()
-    await minio_service.delete_file(document.file_path)
+    # Delete from PVC storage
+    from app.services.storage.file_storage import FileStorage
+    FileStorage().delete_file(document.file_path)
     
     # Delete from database
     db.delete(document)
@@ -592,4 +607,3 @@ async def delete_document(
     logger.info("Document deleted", document_id=str(document_id))
     
     return {"message": "Document deleted"}
-

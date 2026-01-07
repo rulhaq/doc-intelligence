@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customerllm-tei
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tei
+  template:
+    metadata:
+      labels:
+        app: tei
+    spec:
+      containers:
+        - name: tei
+          # Avoid :latest in real clusters; pin a version you tested.
+          # If you prefer latest for POC, you can switch back.
+          image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+          imagePullPolicy: IfNotPresent
+
+          # IMPORTANT: TEI model selection + port should be passed as args
+          args:
+            - --model-id
+            - intfloat/multilingual-e5-large
+            - --port
+            - "8080"
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          # TEI needs a writable cache/model directory; use emptyDir for POC
+          env:
+            - name: HF_HOME
+              value: /tmp/hf
+            - name: TRANSFORMERS_CACHE
+              value: /tmp/hf
+          volumeMounts:
+            - name: tei-cache
+              mountPath: /tmp/hf
+
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "8Gi"
+
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+
+      volumes:
+        - name: tei-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tei
+spec:
+  selector:
+    app: tei
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

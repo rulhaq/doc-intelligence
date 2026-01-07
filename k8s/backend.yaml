@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customerllm-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: customerllm-backend
+  template:
+    metadata:
+      labels:
+        app: customerllm-backend
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: backend
+          image: customerllm-backend:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: customerllm-env
+          ports:
+            - name: http
+              containerPort: 8000
+          volumeMounts:
+            - name: customerllm-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: customerllm-data
+          persistentVolumeClaim:
+            claimName: customerllm-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customerllm-backend
+spec:
+  selector:
+    app: customerllm-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

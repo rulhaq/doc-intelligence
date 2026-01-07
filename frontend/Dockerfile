@@ -12,18 +12,14 @@ RUN npm install
 # Copy source
 COPY . .
 
-# Build args
-ARG VITE_API_URL=http://localhost:8000
-ARG VITE_WS_URL=ws://localhost:8000
-
-ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_WS_URL=$VITE_WS_URL
-
 # Build
 RUN npm run build
 
 # Production stage
 FROM nginx:alpine
+
+# Install envsubst for runtime config
+RUN apk add --no-cache gettext
 
 # Copy build
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -31,7 +27,14 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 3000
+# Runtime config template and entrypoint script
+COPY config.template.js /usr/share/nginx/html/config.template.js
+COPY docker-entrypoint.d/99-runtime-config.sh /docker-entrypoint.d/99-runtime-config.sh
+RUN chmod +x /docker-entrypoint.d/99-runtime-config.sh && \
+    chown -R nginx:nginx /usr/share/nginx/html
+USER nginx
+
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]
 

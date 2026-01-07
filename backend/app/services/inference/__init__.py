@@ -1,5 +1,5 @@
 """Inference Services"""
-from app.services.inference.ollama_service import OllamaService
+from app.services.inference.vllm_service import VLLMService
 
-__all__ = ["OllamaService"]
+__all__ = ["VLLMService"]
 
