@@ -261,6 +261,101 @@ At the end of this section, the setup should be:
 - **LLM (Chat):** OpenShift AI / vLLM Route (token-protected)
 - **Embeddings:** TEI service inside cluster (`http://tei:8080`)
 
+#### 4.3.7 Switching TEI Between CPU and GPUs
+
+This project supports running the **TEI (Text Embeddings Inference)** service on either **CPU** or **GPU**, depending on the OpenShift cluster capabilities.
+
+Two manifests are provided:
+
+- `k8s/tei-cpu.yaml` → CPU-based embeddings
+- `tei-gpu.yaml` → GPU-accelerated embeddings
+
+Both manifests:
+
+- Use the same Deployment name: `customerllm-tei`
+- Use the same Service name: `tei`
+- Expose TEI on port `8080`
+
+This allows seamless switching by applying the desired manifest.
+
+### When to Use CPU vs GPU
+
+**Use CPU when:**
+
+- No GPUs are available in the cluster
+- This is a small-scale POC or demo
+- Embedding throughput is low or moderate
+
+**Use GPU when:**
+
+- GPUs are available and allocated to your namespace
+- Faster embedding generation is required
+- You expect higher ingestion or query volume
+
+### Check if GPUs Are Available
+
+Before deploying the GPU variant, verify that GPU resources exist:
+
+```bash
+oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"  "}{.status.allocatable.nvidia\.com/gpu}{"\n"}{end}'
+```
+
+If you see a number greater than `0`, GPU scheduling is available.
+
+### Deploy TEI on CPU
+
+Apply the CPU manifest:
+
+```bash
+oc apply -f k8s/tei-cpu.yaml
+```
+
+Verify:
+
+```bash
+oc get pods | grep tei
+oc logs deploy/customerllm-tei
+```
+
+### Switch TEI to GPU
+
+To switch from CPU to GPU, simply apply the GPU manifest:
+
+```bash
+oc apply -f tei-gpu.yaml
+```
+
+This will update the existing Deployment in place.
+
+Verify:
+
+```bash
+oc get pods | grep tei
+oc logs deploy/customerllm-tei
+```
+
+You should see logs indicating CUDA/GPU usage.
+
+### Switch Back to CPU
+
+To revert to CPU execution:
+
+```bash
+oc apply -f k8s/tei-cpu.yaml
+```
+
+### Important Notes
+
+- Do **not** deploy both CPU and GPU manifests at the same time.
+- The backend application does **not** need to be restarted when switching.
+- The `TEI_BASE_URL` remains unchanged:
+
+  ```env
+  TEI_BASE_URL=http://tei:8080
+  ```
+
+- First startup may take several minutes while the model is downloaded.
+
 ---
 
 ### 4.4 Get Routes and Model IDs

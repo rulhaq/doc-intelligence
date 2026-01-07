@@ -14,23 +14,16 @@ spec:
     spec:
       containers:
         - name: tei
-          # Avoid :latest in real clusters; pin a version you tested.
-          # If you prefer latest for POC, you can switch back.
-          image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+          image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.8
           imagePullPolicy: IfNotPresent
-
-          # IMPORTANT: TEI model selection + port should be passed as args
           args:
             - --model-id
             - intfloat/multilingual-e5-large
             - --port
             - "8080"
-
           ports:
             - name: http
               containerPort: 8080
-
-          # TEI needs a writable cache/model directory; use emptyDir for POC
           env:
             - name: HF_HOME
               value: /tmp/hf
@@ -39,34 +32,32 @@ spec:
           volumeMounts:
             - name: tei-cache
               mountPath: /tmp/hf
-
           readinessProbe:
             tcpSocket:
               port: http
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 2
-            failureThreshold: 6
+            failureThreshold: 10
           livenessProbe:
             tcpSocket:
               port: http
-            initialDelaySeconds: 20
+            initialDelaySeconds: 30
             periodSeconds: 20
             timeoutSeconds: 2
-            failureThreshold: 6
-
+            failureThreshold: 10
           resources:
             requests:
               cpu: "500m"
-              memory: "2Gi"
+              memory: "4Gi"
+              nvidia.com/gpu: "1"
             limits:
-              cpu: "2"
-              memory: "8Gi"
-
+              cpu: "4"
+              memory: "16Gi"
+              nvidia.com/gpu: "1"
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
-
       volumes:
         - name: tei-cache
           emptyDir: {}
