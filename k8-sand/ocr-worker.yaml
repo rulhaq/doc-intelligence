@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customerllm-ocr-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: customerllm-ocr-worker
+  template:
+    metadata:
+      labels:
+        app: customerllm-ocr-worker
+    spec:
+      securityContext:
+        fsGroup: 1009190000
+      containers:
+        - name: ocr-worker
+          image: image-registry.openshift-image-registry.svc:5000/karim-itani-dev/customerllm-ocr-worker:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: customerllm-env
+          ports:
+            - name: http
+              containerPort: 8001
+          volumeMounts:
+            - name: customerllm-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: customerllm-data
+          persistentVolumeClaim:
+            claimName: customerllm-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customerllm-ocr-worker
+spec:
+  selector:
+    app: customerllm-ocr-worker
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

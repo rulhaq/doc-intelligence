@@ -23,6 +23,9 @@ spec:
       labels:
         app: postgres
     spec:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: Always
       containers:
         - name: postgres
           image: postgres:15
@@ -30,6 +33,9 @@ spec:
           envFrom:
             - secretRef:
                 name: customerllm-env
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           ports:
             - name: db
               containerPort: 5432

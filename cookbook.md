@@ -662,3 +662,73 @@ oc describe pod <pod>
 ---
 
 **End of Cookbook**
+
+---
+
+## Appendix: Jump Server Build + Deploy Flow (Binary Builds)
+
+Before running the build steps, make sure your **vLLM routes + token** are set
+in `.env.openshift` and that you have created the secret. The backend expects
+those values on startup.
+
+1. Login and select project:
+
+oc whoami --show-token
+
+```bash
+oc login https://<cluster-api>:6443 --token=<TOKEN>
+oc project <namespace>
+```
+
+2. Create/update the secret:
+
+```bash
+oc create secret generic customerllm-env --from-env-file=.env.openshift --dry-run=client -o yaml | oc apply -f -
+```
+
+3. Create build resources:
+
+```bash
+oc apply -f k8s/builds.yaml
+```
+
+4. Build images from your local repo:
+
+```bash
+oc start-build customerllm-backend --from-dir=backend --follow
+oc start-build customerllm-frontend --from-dir=frontend --follow
+oc start-build customerllm-ocr-worker --from-dir=ocr-worker --follow
+```
+
+5. Deploy storage + services:
+
+```bash
+oc apply -f k8s/storage-pvc.yaml
+oc apply -f k8s/postgres.yaml
+oc apply -f k8s/redis.yaml
+oc apply -f k8s/qdrant.yaml
+oc apply -f k8s/tei-cpu.yaml
+```
+
+6. Run DB seed job (one time):
+
+```bash
+oc apply -f k8s/db-seed-job.yaml
+oc wait --for=condition=complete job/customerllm-db-seed --timeout=300s
+```
+
+7. Deploy app components:
+
+```bash
+oc apply -f k8s/backend.yaml
+oc apply -f k8s/ocr-worker.yaml
+oc apply -f k8s/frontend.yaml
+```
+
+8. Expose routes:
+
+```bash
+oc expose svc customerllm-backend
+oc expose svc customerllm-frontend
+oc get routes
+```

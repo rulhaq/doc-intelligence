@@ -1,0 +1,62 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: customerllm-backend
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: customerllm-frontend
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: customerllm-ocr-worker
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: customerllm-backend
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: customerllm-backend:latest
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: customerllm-frontend
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: customerllm-frontend:latest
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: customerllm-ocr-worker
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: customerllm-ocr-worker:latest

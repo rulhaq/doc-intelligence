@@ -33,7 +33,8 @@ COPY config.template.js /usr/share/nginx/html/config.template.js
 COPY docker-entrypoint.d/99-runtime-config.sh /docker-entrypoint.d/99-runtime-config.sh
 RUN chmod +x /docker-entrypoint.d/99-runtime-config.sh && \
     mkdir -p /var/cache/nginx /var/run/nginx && \
-    chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/run/nginx
+    chown -R nginx:nginx /var/cache/nginx /var/run/nginx && \
+    chmod -R 0777 /usr/share/nginx/html
 USER nginx
 
 EXPOSE 8080
