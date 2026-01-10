@@ -20,9 +20,10 @@ COPY . .
 # Create non-root user and required directories
 RUN groupadd --system app && useradd --system --gid app --home /app app && \
     mkdir -p /data /var/log/customerllm && \
-    chown -R app:app /app /data /var/log/customerllm
+    chown -R app:app /app /data /var/log/customerllm && \
+    chmod +x /app/docker-entrypoint.sh
 
 # Run application
 USER app
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --workers ${UVICORN_WORKERS:-4}"]
+CMD ["sh", "/app/docker-entrypoint.sh"]
 

@@ -1,0 +1,7 @@
+for docker test 
+
+create a .env.local 
+
+put the contents of env copy.local.txt inside .env.local
+
+run docker compose -p redhat-qpp -f docker-compose-test-local.yml up --build

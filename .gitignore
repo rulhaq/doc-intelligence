@@ -54,7 +54,6 @@ dist-ssr/
 
 # Environment
 .env
-.env.local
 .env.production
 *.pem
 *.key

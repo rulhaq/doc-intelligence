@@ -438,6 +438,29 @@ SECRET_KEY=<32+ character random string>
 
 ---
 
+---
+
+k-
+
+Deploy vLLM (OpenShift AI) and get the route + model ID.
+Update .env.openshift with VLLM_BASE_URL, VLLM_MODEL, VLLM_API_TOKEN (and embedding route/model if used).
+Create the secret: oc create secret generic customerllm-env --from-env-file=.env.openshift
+(Optional) run the seed job, then oc apply -f k8s/
+
+vllm -> secrets -> app
+
+What to replace each placeholder with ".env.openshift"
+
+BACKEND_URL, FRONTEND_URL, VITE_API_URL, VITE_WS_URL, CORS_ORIGINS: set to the OpenShift Routes you create after oc expose (e.g., https://<route-host>). VITE_WS_URL is the same host but wss://.
+
+POSTGRES_PASSWORD + DATABASE_URL: choose a real password and make sure the URL matches it. Example:
+
+DATABASE_URL=postgresql://customerllm:<your_password>@postgres:5432/customerllm.
+
+VLLM_BASE_URL, VLLM_MODEL, VLLM_EMBEDDING_BASE_URL, VLLM_EMBEDDING_MODEL, VLLM_API_TOKEN: use the values from your OpenShift AI vLLM/embedding routes and the bearer token. You can get model IDs from the vLLM /v1/models endpoint.
+
+SECRET_KEY: generate a strong 32+ char random string.
+
 ## 6. Create OpenShift Secret
 
 ```bash
@@ -450,6 +473,30 @@ This secret injects **all configuration**, including the **vLLM token**, into th
 ---
 
 ## 7. Deploy the Application (Source Code)
+
+Before applying all manifests, run the one-time DB migration + seed job so the
+admin and demo users exist when you first log in.
+
+Add the seed user variables to `.env.openshift` (example values shown):
+
+```env
+SEED_USERS=true
+SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_PASSWORD=admin123
+SEED_ADMIN_USERNAME=admin
+SEED_ADMIN_FULL_NAME=Admin User
+SEED_USER_EMAIL=user@example.com
+SEED_USER_PASSWORD=user123
+SEED_USER_USERNAME=user
+SEED_USER_FULL_NAME=Demo User
+```
+
+Apply the seed job:
+
+```bash
+oc apply -f k8s/db-seed-job.yaml
+oc wait --for=condition=complete job/customerllm-db-seed --timeout=300s
+```
 
 Apply all manifests:
 

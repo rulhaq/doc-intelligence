@@ -38,12 +38,16 @@ async def lifespan(app: FastAPI):
     from app.services.storage.file_storage import FileStorage
     FileStorage().ensure_dirs()
 
+
     # Verify vLLM connectivity
     from app.services.inference.vllm_service import VLLMService
     vllm_service = VLLMService()
     if not await vllm_service.health_check():
         logger.error("vLLM health check failed")
         raise RuntimeError("vLLM is unavailable")
+
+
+    #logger.info("Skipping vLLM health check at startup")
     
     logger.info("Application startup complete")
     

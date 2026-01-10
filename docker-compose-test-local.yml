@@ -1,0 +1,80 @@
+name: redhat-qpp
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    env_file:
+      - .env.local
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+    command:
+      - --model-id
+      - intfloat/multilingual-e5-base
+      - --port
+      - "8080"
+    ports:
+      - "8082:8080"
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env.local
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+      - tei
+      - ocr-worker
+    volumes:
+      - backend-data:/data
+
+  ocr-worker:
+    build:
+      context: ./ocr-worker
+    env_file:
+      - .env.local
+    ports:
+      - "8001:8001"
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+    env_file:
+      - .env.local
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:
+  qdrant-data:
+  backend-data:
+
+networks:
+  default:
+    name: redhat-qpp

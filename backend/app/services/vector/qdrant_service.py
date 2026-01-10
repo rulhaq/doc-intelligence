@@ -1,6 +1,7 @@
 """Qdrant Vector Database Service"""
 from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
     Distance,
     VectorParams,
@@ -39,30 +40,41 @@ class QdrantService:
             if self.collection_name not in collection_names:
                 logger.info(f"Creating Qdrant collection: {self.collection_name}")
                 
-                self.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=VectorParams(
-                        size=settings.EMBEDDING_DIMENSION,
-                        distance=Distance.COSINE,
-                    ),
-                )
+                try:
+                    self.client.create_collection(
+                        collection_name=self.collection_name,
+                        vectors_config=VectorParams(
+                            size=settings.EMBEDDING_DIMENSION,
+                            distance=Distance.COSINE,
+                        ),
+                    )
+                except UnexpectedResponse as exc:
+                    if exc.status_code == 409:
+                        logger.info(
+                            f"Qdrant collection already exists (race): {self.collection_name}"
+                        )
+                    else:
+                        raise
                 
                 # Create indexes for faster filtering
-                self.client.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name="doc_id",
-                    field_schema="keyword",
-                )
-                self.client.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name="source",
-                    field_schema="keyword",
-                )
-                self.client.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name="page",
-                    field_schema="integer",
-                )
+                for field_name, field_schema in (
+                    ("doc_id", "keyword"),
+                    ("source", "keyword"),
+                    ("page", "integer"),
+                ):
+                    try:
+                        self.client.create_payload_index(
+                            collection_name=self.collection_name,
+                            field_name=field_name,
+                            field_schema=field_schema,
+                        )
+                    except UnexpectedResponse as exc:
+                        if exc.status_code == 409:
+                            logger.info(
+                                f"Qdrant index already exists (race): {field_name}"
+                            )
+                        else:
+                            raise
                 
                 logger.info(f"Qdrant collection created: {self.collection_name}")
             else:

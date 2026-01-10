@@ -18,7 +18,7 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --model-id
-            - intfloat/multilingual-e5-large
+            - intfloat/multilingual-e5-base
             - --port
             - "8080"
           ports:
