@@ -49,7 +49,9 @@ class EmbeddingsService:
             "model": self.vllm_model,
             "input": texts,
         }
-        headers = {"Authorization": f"Bearer {self.vllm_token}"}
+        headers = {}
+        if self.vllm_token:
+            headers = {"Authorization": f"Bearer {self.vllm_token}"}
 
         try:
             async with httpx.AsyncClient(timeout=self.vllm_timeout) as client:

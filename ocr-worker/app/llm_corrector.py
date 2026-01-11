@@ -26,10 +26,12 @@ class LLMCorrector:
         self.timeout = float(os.getenv("VLLM_TIMEOUT", "60"))
 
         if self.enabled:
-            if not self.base_url or not self.model or not self.token:
-                raise RuntimeError("VLLM_BASE_URL, VLLM_MODEL, and VLLM_API_TOKEN are required for OCR LLM correction")
+            if not self.base_url or not self.model:
+                raise RuntimeError("VLLM_BASE_URL and VLLM_MODEL are required for OCR LLM correction")
             self.base_url = _normalize_base_url(self.base_url)
-            self.headers = {"Authorization": f"Bearer {self.token}"}
+            self.headers = {}
+            if self.token:
+                self.headers = {"Authorization": f"Bearer {self.token}"}
 
         logger.info(
             "LLM corrector initialized",

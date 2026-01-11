@@ -47,8 +47,9 @@ class Settings(BaseSettings):
     VLLM_MODEL: str
     VLLM_EMBEDDING_BASE_URL: Optional[str] = None
     VLLM_EMBEDDING_MODEL: Optional[str] = None
-    VLLM_API_TOKEN: str
+    VLLM_API_TOKEN: Optional[str] = None
     VLLM_TIMEOUT: int = 300
+    VLLM_HEALTHCHECK_ENABLED: bool = True
 
     # Embeddings provider
     EMBEDDINGS_PROVIDER: str
@@ -174,7 +175,6 @@ class Settings(BaseSettings):
         "FILE_STORAGE_PATH",
         "VLLM_BASE_URL",
         "VLLM_MODEL",
-        "VLLM_API_TOKEN",
         "EMBEDDINGS_PROVIDER",
         "OCR_WORKER_URL",
         "SECRET_KEY",

@@ -206,10 +206,13 @@ async def get_system_stats(
         base_url = settings.VLLM_BASE_URL.rstrip("/")
         if base_url.endswith("/v1"):
             base_url = base_url[:-3]
+        headers = {}
+        if settings.VLLM_API_TOKEN:
+            headers = {"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"}
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(
                 f"{base_url}/v1/models",
-                headers={"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"},
+                headers=headers,
             )
             if response.status_code == 200:
                 data = response.json()
@@ -246,10 +249,13 @@ async def get_vllm_models(
         base_url = settings.VLLM_BASE_URL.rstrip("/")
         if base_url.endswith("/v1"):
             base_url = base_url[:-3]
+        headers = {}
+        if settings.VLLM_API_TOKEN:
+            headers = {"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"}
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 f"{base_url}/v1/models",
-                headers={"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"},
+                headers=headers,
             )
             if response.status_code == 200:
                 data = response.json()
@@ -275,10 +281,13 @@ async def get_system_health(
         base_url = settings.VLLM_BASE_URL.rstrip("/")
         if base_url.endswith("/v1"):
             base_url = base_url[:-3]
+        headers = {}
+        if settings.VLLM_API_TOKEN:
+            headers = {"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"}
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(
                 f"{base_url}/v1/models",
-                headers={"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"},
+                headers=headers,
             )
             services["vllm"] = "healthy" if response.status_code == 200 else "error"
     except:

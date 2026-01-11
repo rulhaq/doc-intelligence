@@ -29,7 +29,9 @@ class VLLMService:
             self.embedding_base_url = _normalize_base_url(settings.VLLM_EMBEDDING_BASE_URL)
             self.embedding_model = settings.VLLM_EMBEDDING_MODEL
         self.timeout = settings.VLLM_TIMEOUT
-        self.headers = {"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"}
+        self.headers = {}
+        if settings.VLLM_API_TOKEN:
+            self.headers = {"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"}
 
     async def generate_completion(
         self,
