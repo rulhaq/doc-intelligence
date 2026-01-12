@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     VLLM_API_TOKEN: Optional[str] = None
     VLLM_TIMEOUT: int = 300
     VLLM_HEALTHCHECK_ENABLED: bool = True
+    VLLM_HEALTHCHECK_STRICT: bool = True
 
     # Embeddings provider
     EMBEDDINGS_PROVIDER: str
@@ -125,7 +126,10 @@ class Settings(BaseSettings):
     def get_cors_origins_list(self) -> List[str]:
         """Parse CORS_ORIGINS string into list"""
         if isinstance(self.CORS_ORIGINS, str):
-            return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+            # Browsers send the Origin header without a trailing slash. Normalize any
+            # configured origins to avoid mismatches like `https://example.com/` vs
+            # `https://example.com`.
+            return [origin.strip().rstrip("/") for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
         return self.CORS_ORIGINS
 
     @field_validator("EMBEDDINGS_PROVIDER")

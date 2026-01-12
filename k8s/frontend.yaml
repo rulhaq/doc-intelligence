@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: customerllm-frontend
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"customerllm-frontend:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"frontend\")].image"}]
 spec:
   replicas: 1
   selector:
@@ -15,7 +18,7 @@ spec:
       containers:
         - name: frontend
           image: customerllm-frontend:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - secretRef:
                 name: customerllm-env
@@ -49,3 +52,17 @@ spec:
     - name: http
       port: 80
       targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: customerllm-frontend
+spec:
+  to:
+    kind: Service
+    name: customerllm-frontend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

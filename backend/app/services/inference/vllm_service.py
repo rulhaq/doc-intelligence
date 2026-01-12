@@ -172,6 +172,16 @@ class VLLMService:
                     f"{self.base_url}/models",
                     headers=self.headers,
                 )
+                # When no token is configured, some deployments return 401/403 for protected routes.
+                # Treat that as "reachable" so the rest of the app can start, while still surfacing
+                # that authentication is required to actually use the LLM.
+                if response.status_code in (401, 403) and not settings.VLLM_API_TOKEN:
+                    logger.warning(
+                        "vLLM reachable but requires authentication (no token configured)",
+                        status_code=response.status_code,
+                    )
+                    return True
+
                 response.raise_for_status()
                 return True
         except httpx.HTTPError:

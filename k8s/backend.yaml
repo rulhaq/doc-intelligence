@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: customerllm-backend
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"customerllm-backend:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"backend\")].image"}]
 spec:
   replicas: 1
   selector:
@@ -13,31 +16,48 @@ spec:
         app: customerllm-backend
     spec:
       securityContext:
-        fsGroup: 1000
+        fsGroup: 1000890000
       containers:
         - name: backend
           image: customerllm-backend:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - secretRef:
                 name: customerllm-env
+          env:
+            - name: UVICORN_WORKERS
+              value: "1"
+            - name: WAIT_FOR_DB
+              value: "false"
+            - name: RUN_MIGRATIONS
+              value: "false"
+            - name: SEED_USERS
+              value: "false"
           ports:
             - name: http
               containerPort: 8000
           volumeMounts:
             - name: customerllm-data
               mountPath: /data
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 60
           readinessProbe:
             httpGet:
               path: /ready
               port: http
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30
             periodSeconds: 20
           securityContext:
             runAsNonRoot: true
@@ -58,3 +78,17 @@ spec:
     - name: http
       port: 80
       targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: customerllm-backend
+spec:
+  to:
+    kind: Service
+    name: customerllm-backend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

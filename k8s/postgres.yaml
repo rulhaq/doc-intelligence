@@ -24,7 +24,7 @@ spec:
         app: postgres
     spec:
       securityContext:
-        fsGroup: 1000
+        fsGroup: 1000890000
         fsGroupChangePolicy: Always
       containers:
         - name: postgres

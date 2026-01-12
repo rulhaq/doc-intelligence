@@ -216,13 +216,27 @@ class QdrantService:
         """Get collection information"""
         try:
             info = self.client.get_collection(self.collection_name)
+
+            vectors_count = getattr(info, "vectors_count", None)
+            points_count = getattr(info, "points_count", None)
+            status = getattr(info, "status", None)
+
+            # Qdrant / qdrant-client have changed response fields across versions.
+            # Fall back to whatever is available rather than failing readiness.
+            if points_count is None and hasattr(info, "result") and getattr(info.result, "points_count", None) is not None:
+                points_count = info.result.points_count
+            if vectors_count is None and hasattr(info, "result") and getattr(info.result, "vectors_count", None) is not None:
+                vectors_count = info.result.vectors_count
+            if status is None and hasattr(info, "result") and getattr(info.result, "status", None) is not None:
+                status = info.result.status
+
             return {
                 "name": info.config.name if hasattr(info.config, 'name') else self.collection_name,
-                "vectors_count": info.vectors_count,
-                "points_count": info.points_count,
-                "status": info.status,
+                "vectors_count": vectors_count,
+                "points_count": points_count,
+                "status": status,
             }
         except Exception as e:
             logger.error(f"Failed to get collection info: {e}")
-            return {}
+            raise ServiceUnavailableException(f"Failed to get collection info: {e}")
 

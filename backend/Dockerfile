@@ -19,11 +19,12 @@ COPY . .
 
 # Create non-root user and required directories
 RUN groupadd --system app && useradd --system --gid app --home /app app && \
+    sed -i 's/\r$//' /app/docker-entrypoint.sh && \
     mkdir -p /data /var/log/customerllm && \
     chown -R app:app /app /data /var/log/customerllm && \
     chmod +x /app/docker-entrypoint.sh
 
 # Run application
 USER app
-CMD ["sh", "/app/docker-entrypoint.sh"]
+CMD ["sh", "-c", "sed 's/\\r$//' /app/docker-entrypoint.sh > /tmp/docker-entrypoint.sh && chmod +x /tmp/docker-entrypoint.sh && exec sh /tmp/docker-entrypoint.sh"]
 

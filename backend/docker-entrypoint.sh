@@ -1,7 +1,9 @@
 #!/bin/sh
 set -eu
 
-if [ "${WAIT_FOR_DB:-true}" = "true" ]; then
+# In Kubernetes/OpenShift, run migrations and seeding via the dedicated Job
+# (`k8s/db-seed-job.yaml`). Keep the API startup fast by default.
+if [ "${WAIT_FOR_DB:-false}" = "true" ]; then
   python - <<'PY'
 import os
 import time
@@ -23,7 +25,7 @@ else:
 PY
 fi
 
-if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
   alembic upgrade head
 fi
 

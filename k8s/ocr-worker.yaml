@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: customerllm-ocr-worker
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"customerllm-ocr-worker:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ocr-worker\")].image"}]
 spec:
   replicas: 1
   selector:
@@ -13,14 +16,22 @@ spec:
         app: customerllm-ocr-worker
     spec:
       securityContext:
-        fsGroup: 1000
+        fsGroup: 1000890000
+        fsGroupChangePolicy: Always
       containers:
         - name: ocr-worker
           image: customerllm-ocr-worker:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - secretRef:
                 name: customerllm-env
+          env:
+            # PaddleOCR caches models under ~/.paddleocr; OpenShift runs with random UIDs
+            # and can't write to /.paddleocr, so point HOME to a writable path.
+            - name: HOME
+              value: /data
+            - name: XDG_CACHE_HOME
+              value: /data/.cache
           ports:
             - name: http
               containerPort: 8001

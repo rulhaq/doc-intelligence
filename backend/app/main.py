@@ -39,15 +39,19 @@ async def lifespan(app: FastAPI):
     FileStorage().ensure_dirs()
 
 
-    # Verify vLLM connectivity
-    from app.services.inference.vllm_service import VLLMService
-    vllm_service = VLLMService()
-    if not await vllm_service.health_check():
-        logger.error("vLLM health check failed")
-        raise RuntimeError("vLLM is unavailable")
+    # Verify vLLM connectivity (optional)
+    if settings.VLLM_HEALTHCHECK_ENABLED:
+        from app.services.inference.vllm_service import VLLMService
 
-
-    logger.info("Skipping vLLM health check at startup")
+        vllm_service = VLLMService()
+        vllm_ok = await vllm_service.health_check()
+        if not vllm_ok:
+            logger.error("vLLM health check failed")
+            if settings.VLLM_HEALTHCHECK_STRICT:
+                raise RuntimeError("vLLM is unavailable")
+            logger.warning("Continuing startup without vLLM")
+    else:
+        logger.info("Skipping vLLM health check at startup")
     
     logger.info("Application startup complete")
     
@@ -157,16 +161,14 @@ async def readiness_check():
     from app.services.inference.vllm_service import VLLMService
     from app.services.vector.qdrant_service import QdrantService
 
-    checks = {
-        "vllm": await VLLMService().health_check(),
-    }
+    checks = {"vllm": await VLLMService().health_check()}
     try:
         await QdrantService().get_collection_info()
         checks["qdrant"] = True
     except Exception:
         checks["qdrant"] = False
 
-    ready = all(checks.values())
+    ready = all(checks.values()) if settings.VLLM_HEALTHCHECK_STRICT else checks["qdrant"]
     return {"ready": ready, "checks": checks}
 
 

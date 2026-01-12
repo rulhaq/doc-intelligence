@@ -13,7 +13,7 @@ spec:
       containers:
         - name: db-seed
           image: customerllm-backend:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - secretRef:
                 name: customerllm-env

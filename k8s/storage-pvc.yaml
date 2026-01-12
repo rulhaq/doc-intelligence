@@ -4,7 +4,8 @@ metadata:
   name: customerllm-data-pvc
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
+  storageClassName: gp3-csi
   resources:
     requests:
-      storage: 20Gi
+      storage: 10Gi

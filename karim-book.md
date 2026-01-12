@@ -35,6 +35,10 @@ Step A: Configure vLLM + TEI in `.env.openshift`
    - `EMBEDDINGS_PROVIDER=tei`
    - `TEI_BASE_URL=http://tei:8080`
 
+If you want to deploy without the LLM token/model yet:
+- Keep `VLLM_HEALTHCHECK_ENABLED=true` (so startup logs show reachability)
+- Set `VLLM_HEALTHCHECK_STRICT=false` (so backend still starts and `/ready` can pass)
+
 Step B: Create the OpenShift secret
 ```
 oc create secret generic customerllm-env --from-env-file=.env.openshift --dry-run=client -o yaml | oc apply -f -
@@ -104,7 +108,7 @@ oc logs deploy/customerllm-tei
 ```
 
 Notes / readiness checks:
-- `k8s/storage-pvc.yaml` uses ReadWriteMany; ensure your storage class supports RWX.
+- `k8s/storage-pvc.yaml` uses ReadWriteOnce (RWO) with `gp3-csi` (AWS EBS); only one pod can mount it at a time.
 - `k8s/tei-cpu.yaml` uses `intfloat/multilingual-e5-base` (768-dim).
 - Backend uses Qdrant vector size 768, matching the TEI model output.
-- vLLM must be reachable for `/ready` to pass.
+- If `VLLM_HEALTHCHECK_STRICT=true`, vLLM must be healthy for `/ready` to pass.

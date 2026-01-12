@@ -12,6 +12,9 @@ spec:
       labels:
         app: tei
     spec:
+      securityContext:
+        fsGroup: 1000890000
+        fsGroupChangePolicy: Always
       containers:
         - name: tei
           image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.8
@@ -26,12 +29,16 @@ spec:
               containerPort: 8080
           env:
             - name: HF_HOME
-              value: /tmp/hf
+              value: /data
             - name: TRANSFORMERS_CACHE
-              value: /tmp/hf
+              value: /data
+            - name: HUGGINGFACE_HUB_CACHE
+              value: /data
           volumeMounts:
             - name: tei-cache
               mountPath: /tmp/hf
+            - name: tei-data
+              mountPath: /data
           readinessProbe:
             tcpSocket:
               port: http
@@ -60,6 +67,8 @@ spec:
             allowPrivilegeEscalation: false
       volumes:
         - name: tei-cache
+          emptyDir: {}
+        - name: tei-data
           emptyDir: {}
 ---
 apiVersion: v1

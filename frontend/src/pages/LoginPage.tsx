@@ -108,9 +108,9 @@ export default function LoginPage() {
           <div className="bg-blue-50 rounded-lg p-4 text-center">
             <p className="text-xs font-medium text-blue-900 mb-2">Demo Credentials</p>
             <div className="space-y-1 text-sm text-blue-700">
-              <p className="font-mono bg-white px-3 py-1 rounded inline-block">admin / admin123</p>
+              <p className="font-mono bg-white px-3 py-1 rounded inline-block">admin / admin123456</p>
               <p className="text-xs text-blue-600 mt-2">or</p>
-              <p className="font-mono bg-white px-3 py-1 rounded inline-block">user / user123</p>
+              <p className="font-mono bg-white px-3 py-1 rounded inline-block">user / user123456</p>
             </div>
           </div>
         </div>
