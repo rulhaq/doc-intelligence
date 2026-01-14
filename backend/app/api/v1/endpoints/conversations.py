@@ -381,9 +381,6 @@ Answer:"""
         prompt=prompt,
         system_prompt=SYSTEM_PROMPT,
     )
-    citations_text = _build_citations(relevant_results)
-    if citations_text:
-        assistant_text = f"{assistant_text}\n\n{citations_text}"
 
     inference_time = int((time.time() - start_time) * 1000)
     
@@ -584,11 +581,6 @@ Answer:"""
             async for token in vllm_service.generate_completion_stream(prompt, system_prompt=SYSTEM_PROMPT):
                 await websocket.send_json({"type": "token", "content": token})
                 full_response += token
-
-            citations_text = _build_citations(relevant_results)
-            if citations_text:
-                await websocket.send_json({"type": "token", "content": f"\n\n{citations_text}"})
-                full_response = f"{full_response}\n\n{citations_text}"
 
             await websocket.send_json({"type": "done"})
             # Save assistant message

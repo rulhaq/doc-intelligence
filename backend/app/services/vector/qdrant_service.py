@@ -165,14 +165,73 @@ class QdrantService:
                 if conditions:
                     qdrant_filter = Filter(must=conditions)
             
-            # Search
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=query_vector,
-                limit=limit,
-                score_threshold=score_threshold,
-                query_filter=qdrant_filter,
-            )
+            # Search (qdrant-client API varies by version)
+            results = None
+
+            candidates: List[tuple[str, Dict[str, Any]]] = [
+                (
+                    "search",
+                    {
+                        "collection_name": self.collection_name,
+                        "query_vector": query_vector,
+                        "limit": limit,
+                        "score_threshold": score_threshold,
+                        "query_filter": qdrant_filter,
+                    },
+                ),
+                (
+                    "search_points",
+                    {
+                        "collection_name": self.collection_name,
+                        "query_vector": query_vector,
+                        "limit": limit,
+                        "score_threshold": score_threshold,
+                        "query_filter": qdrant_filter,
+                    },
+                ),
+                # Newer clients switched to the "query" API naming.
+                (
+                    "query_points",
+                    {
+                        "collection_name": self.collection_name,
+                        "query": query_vector,
+                        "limit": limit,
+                        "score_threshold": score_threshold,
+                        "query_filter": qdrant_filter,
+                    },
+                ),
+                (
+                    "query_points",
+                    {
+                        "collection_name": self.collection_name,
+                        "query": query_vector,
+                        "limit": limit,
+                        "score_threshold": score_threshold,
+                        "filter": qdrant_filter,
+                    },
+                ),
+            ]
+
+            last_type_error: Optional[Exception] = None
+            for method_name, kwargs in candidates:
+                method = getattr(self.client, method_name, None)
+                if not callable(method):
+                    continue
+                try:
+                    results = method(**kwargs)
+                    break
+                except TypeError as exc:
+                    last_type_error = exc
+                    continue
+
+            if results is None:
+                if last_type_error is not None:
+                    raise last_type_error
+                raise AttributeError("Qdrant client does not support search/search_points/query_points")
+
+            # Some clients return a response object with a `.points` list.
+            if hasattr(results, "points"):
+                results = results.points
             
             # Format results
             formatted_results = [
