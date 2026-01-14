@@ -37,37 +37,67 @@ class VLLMService:
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        temperature: float = 0.7,
+        temperature: float = settings.VLLM_TEMPERATURE,
         max_tokens: Optional[int] = None,
     ) -> str:
-        """Generate a non-streaming chat completion."""
+        """Generate a non-streaming completion.
+
+        Prefers the OpenAI Chat Completions API (`/v1/chat/completions`), but falls back
+        to the legacy Completions API (`/v1/completions`) if the server doesn't support chat.
+        """
+
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        payload: Dict[str, Any] = {
+        chat_payload: Dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
             "stream": False,
         }
         if max_tokens:
-            payload["max_tokens"] = max_tokens
+            chat_payload["max_tokens"] = max_tokens
+
+        # Legacy completions payload (prompt-based)
+        completion_prompt = prompt if not system_prompt else f"{system_prompt}\n\n{prompt}"
+        completion_payload: Dict[str, Any] = {
+            "model": self.model,
+            "prompt": completion_prompt,
+            "temperature": temperature,
+            "stream": False,
+        }
+        if max_tokens:
+            completion_payload["max_tokens"] = max_tokens
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
-                    json=payload,
+                    json=chat_payload,
                     headers=self.headers,
                 )
+                if response.status_code in (404, 405):
+                    response = await client.post(
+                        f"{self.base_url}/completions",
+                        json=completion_payload,
+                        headers=self.headers,
+                    )
+
                 response.raise_for_status()
                 result = response.json()
                 choices = result.get("choices") or []
-                if choices:
-                    return choices[0].get("message", {}).get("content", "") or ""
-                return ""
+                if not choices:
+                    return ""
+
+                # Chat format
+                message = choices[0].get("message")
+                if isinstance(message, dict):
+                    return message.get("content", "") or ""
+
+                # Completions format
+                return choices[0].get("text", "") or ""
         except httpx.HTTPError as exc:
             logger.error("vLLM generation failed", error=str(exc))
             raise ServiceUnavailableException(f"LLM inference failed: {exc}")
@@ -76,55 +106,92 @@ class VLLMService:
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        temperature: float = 0.7,
+        temperature: float = settings.VLLM_TEMPERATURE,
         max_tokens: Optional[int] = None,
     ) -> AsyncIterator[str]:
-        """Generate a streaming chat completion."""
+        """Generate a streaming completion.
+
+        Prefers the OpenAI Chat Completions streaming API, but falls back to legacy
+        completions streaming if chat is unsupported.
+        """
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        payload: Dict[str, Any] = {
+        chat_payload: Dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
             "stream": True,
         }
         if max_tokens:
-            payload["max_tokens"] = max_tokens
+            chat_payload["max_tokens"] = max_tokens
+
+        completion_prompt = prompt if not system_prompt else f"{system_prompt}\n\n{prompt}"
+        completion_payload: Dict[str, Any] = {
+            "model": self.model,
+            "prompt": completion_prompt,
+            "temperature": temperature,
+            "stream": True,
+        }
+        if max_tokens:
+            completion_payload["max_tokens"] = max_tokens
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # First attempt: chat completions
                 async with client.stream(
                     "POST",
                     f"{self.base_url}/chat/completions",
-                    json=payload,
+                    json=chat_payload,
                     headers=self.headers,
                 ) as response:
+                    if response.status_code in (404, 405):
+                        # Fallback: legacy completions
+                        async with client.stream(
+                            "POST",
+                            f"{self.base_url}/completions",
+                            json=completion_payload,
+                            headers=self.headers,
+                        ) as fallback_response:
+                            fallback_response.raise_for_status()
+                            async for token in self._iter_sse_tokens(fallback_response, mode="completions"):
+                                yield token
+                            return
+
                     response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line:
-                            continue
-                        if not line.startswith("data:"):
-                            continue
-                        payload_text = line[len("data:"):].strip()
-                        if payload_text == "[DONE]":
-                            continue
-                        try:
-                            chunk = json.loads(payload_text)
-                        except json.JSONDecodeError:
-                            continue
-                        choices = chunk.get("choices") or []
-                        if not choices:
-                            continue
-                        delta = choices[0].get("delta", {})
-                        token = delta.get("content")
-                        if token:
-                            yield token
+                    async for token in self._iter_sse_tokens(response, mode="chat"):
+                        yield token
         except httpx.HTTPError as exc:
             logger.error("vLLM streaming failed", error=str(exc))
             raise ServiceUnavailableException(f"LLM streaming failed: {exc}")
+
+    async def _iter_sse_tokens(self, response: httpx.Response, *, mode: str) -> AsyncIterator[str]:
+        async for line in response.aiter_lines():
+            if not line or not line.startswith("data:"):
+                continue
+            payload_text = line[len("data:"):].strip()
+            if payload_text == "[DONE]":
+                continue
+            try:
+                chunk = json.loads(payload_text)
+            except json.JSONDecodeError:
+                continue
+
+            choices = chunk.get("choices") or []
+            if not choices:
+                continue
+
+            if mode == "chat":
+                delta = choices[0].get("delta", {})
+                token = delta.get("content")
+                if token:
+                    yield token
+            else:
+                token = choices[0].get("text")
+                if token:
+                    yield token
 
     async def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text."""
