@@ -29,6 +29,7 @@ class VLLMService:
             self.embedding_base_url = _normalize_base_url(settings.VLLM_EMBEDDING_BASE_URL)
             self.embedding_model = settings.VLLM_EMBEDDING_MODEL
         self.timeout = settings.VLLM_TIMEOUT
+        self.tls_verify = settings.VLLM_TLS_VERIFY
         self.headers = {}
         if settings.VLLM_API_TOKEN:
             self.headers = {"Authorization": f"Bearer {settings.VLLM_API_TOKEN}"}
@@ -72,7 +73,7 @@ class VLLMService:
             completion_payload["max_tokens"] = max_tokens
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, verify=self.tls_verify) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
                     json=chat_payload,
@@ -139,7 +140,7 @@ class VLLMService:
             completion_payload["max_tokens"] = max_tokens
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, verify=self.tls_verify) as client:
                 # First attempt: chat completions
                 async with client.stream(
                     "POST",
@@ -232,21 +233,37 @@ class VLLMService:
             raise ServiceUnavailableException(f"Embedding generation failed: {exc}")
 
     async def health_check(self) -> bool:
-        """Check if vLLM is reachable."""
+        """Check if vLLM is reachable.
+
+        Prefer `/v1/models`. If it's not supported by the server (404/405), fall back to a
+        tiny `/v1/completions` POST.
+        """
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{self.base_url}/models",
-                    headers=self.headers,
-                )
-                # When no token is configured, some deployments return 401/403 for protected routes.
-                # Treat that as "reachable" so the rest of the app can start, while still surfacing
-                # that authentication is required to actually use the LLM.
+            async with httpx.AsyncClient(timeout=10.0, verify=self.tls_verify) as client:
+                response = await client.get(f"{self.base_url}/models", headers=self.headers)
+
                 if response.status_code in (401, 403) and not settings.VLLM_API_TOKEN:
                     logger.warning(
                         "vLLM reachable but requires authentication (no token configured)",
                         status_code=response.status_code,
                     )
+                    return True
+
+                if response.status_code in (404, 405):
+                    # Server might only implement /v1/completions. Use a minimal prompt as a ping.
+                    ping_payload = {
+                        "model": self.model,
+                        "prompt": "ping",
+                        "max_tokens": 1,
+                        "temperature": 0.0,
+                        "stream": False,
+                    }
+                    ping_response = await client.post(
+                        f"{self.base_url}/completions",
+                        json=ping_payload,
+                        headers=self.headers,
+                    )
+                    ping_response.raise_for_status()
                     return True
 
                 response.raise_for_status()

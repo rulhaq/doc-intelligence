@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     VLLM_API_TOKEN: Optional[str] = None
     VLLM_TIMEOUT: int = 300
     VLLM_TEMPERATURE: float = 0.2
+    VLLM_TLS_VERIFY: bool = True
     VLLM_HEALTHCHECK_ENABLED: bool = True
     VLLM_HEALTHCHECK_STRICT: bool = True
 
