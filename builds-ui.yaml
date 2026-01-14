@@ -1,0 +1,89 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: customerllm-backend
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: customerllm-frontend
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: customerllm-ocr-worker
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: customerllm-backend
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/rulhaq/doc-intelligence.git
+      ref: vllm-redhat-qpp-poc
+    contextDir: backend
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: customerllm-backend:latest
+  triggers:
+    - type: ConfigChange
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: customerllm-frontend
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/rulhaq/doc-intelligence.git
+      ref: vllm-redhat-qpp-poc
+    contextDir: frontend
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: customerllm-frontend:latest
+  triggers:
+    - type: ConfigChange
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: customerllm-ocr-worker
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/rulhaq/doc-intelligence.git
+      ref: vllm-redhat-qpp-poc
+    contextDir: ocr-worker
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: customerllm-ocr-worker:latest
+  triggers:
+    - type: ConfigChange
