@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qpp-frontend
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"qpp-frontend:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"frontend\")].image"}]
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qpp-frontend
+  template:
+    metadata:
+      labels:
+        app: qpp-frontend
+    spec:
+      imagePullSecrets:
+        - name: quay-push-secret
+      containers:
+        - name: frontend
+          image: imageregistry.pp.gov.qa/scalovate/qpp-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qpp-frontend
+spec:
+  selector:
+    app: qpp-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: qpp-frontend
+spec:
+  to:
+    kind: Service
+    name: qpp-frontend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

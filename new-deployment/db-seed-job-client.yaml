@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qpp-db-seed
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app: qpp-db-seed
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: quay-push-secret
+      containers:
+        - name: db-seed
+          image: imageregistry.pp.gov.qa/scalovate/qpp-backend:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: qpp-secrets
+            - configMapRef:
+                name: qpp-config
+          command:
+            - sh
+            - -c
+            - |
+              python - <<'PY'
+              import os
+              import time
+              import psycopg2
+
+              dsn = os.environ.get("DATABASE_URL")
+              if not dsn:
+                  raise SystemExit("DATABASE_URL is not set")
+
+              for attempt in range(60):
+                  try:
+                      conn = psycopg2.connect(dsn)
+                      conn.close()
+                      break
+                  except Exception:
+                      time.sleep(2)
+              else:
+                  raise SystemExit("Database did not become ready in time")
+              PY
+              python scripts/seed_users.py

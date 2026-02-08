@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qpp-backend
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"qpp-backend:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"backend\")].image"}]
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qpp-backend
+  template:
+    metadata:
+      labels:
+        app: qpp-backend
+    spec:
+      securityContext:
+        fsGroup: 1001080000
+      imagePullSecrets:
+        - name: quay-push-secret
+      containers:
+        - name: backend
+          image: imageregistry.pp.gov.qa/scalovate/qpp-backend:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: qpp-secrets
+            - configMapRef:
+                name: qpp-config
+          ports:
+            - name: http
+              containerPort: 8000
+          volumeMounts:
+            - name: qpp-data
+              mountPath: /app/data
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: qpp-data
+          persistentVolumeClaim:
+            claimName: qpp-data-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qpp-backend
+spec:
+  selector:
+    app: qpp-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: qpp-backend
+spec:
+  to:
+    kind: Service
+    name: qpp-backend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

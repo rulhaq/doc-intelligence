@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scalovate PoC - Case Comparison &amp; Patterns</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#800000",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .filled-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#0d141b] dark:text-slate-50 transition-colors duration-200">
+<div class="flex flex-col min-h-screen">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark px-10 py-3 sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-primary">
+<div class="size-6">
+<svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M36.7273 44C33.9891 44 31.6043 39.8386 30.3636 33.69C29.123 39.8386 26.7382 44 24 44C21.2618 44 18.877 39.8386 17.6364 33.69C16.3957 39.8386 14.0109 44 11.2727 44C7.25611 44 4 35.0457 4 24C4 12.9543 7.25611 4 11.2727 4C14.0109 4 16.3957 8.16144 17.6364 14.31C18.877 8.16144 21.2618 4 24 4C26.7382 4 29.123 8.16144 30.3636 14.31C31.6043 8.16144 33.9891 4 36.7273 4C40.7439 4 44 12.9543 44 24C44 35.0457 40.7439 44 36.7273 44Z"></path>
+</svg>
+</div>
+<h2 class="text-[#0d141b] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">Scalovate PoC</h2>
+</div>
+<label class="flex flex-col min-w-40 !h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full bg-slate-100 dark:bg-slate-800">
+<div class="text-[#4c739a] flex items-center justify-center pl-4">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-transparent focus:ring-0 text-[#0d141b] dark:text-white placeholder:text-[#4c739a] px-4 pl-2 text-base font-normal leading-normal" placeholder="Search cases..." value=""/>
+</div>
+</label>
+</div>
+<div class="flex flex-1 justify-end gap-8">
+<nav class="flex items-center gap-9">
+<a class="text-[#4c739a] hover:text-primary text-sm font-medium leading-normal" href="#">Dashboard</a>
+<a class="text-primary text-sm font-bold leading-normal border-b-2 border-primary pb-0.5" href="#">Intelligence</a>
+<a class="text-[#4c739a] hover:text-primary text-sm font-medium leading-normal" href="#">Reports</a>
+<a class="text-[#4c739a] hover:text-primary text-sm font-medium leading-normal" href="#">Settings</a>
+</nav>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-slate-800 text-[#0d141b] dark:text-white">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-slate-800 text-[#0d141b] dark:text-white">
+<span class="material-symbols-outlined">help</span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User profile avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD7Jjs2iDYOJNwuiSHYuyE3JWMoO0dfv8HPNGx-xqSF76fNuRngsQoT8RVXCKgRaR0jFouRZyHkBBq5E5jw8xtkFmk7LN6dqrifynqagZb0njLvYBB0QZr3MupIYmUBN6_ZmNDpuRf_DDoZFBAS-CxjYgS5Nzdi3KY5JQ4PdO5g97n37Z2Cqr4iXvLs_Y97VP8AvohvGZeOGB_LIG1SNmZQQt8Q_FUs5uAlf4KD5bCaiMdXHvNmbjaUV5CZkraJScK9vmNue1ZyFgXt");'></div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<aside class="w-72 bg-white dark:bg-background-dark border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between p-4 overflow-y-auto">
+<div class="flex flex-col gap-6">
+<div class="flex flex-col">
+<h1 class="text-[#0d141b] dark:text-white text-base font-bold leading-normal">Case Explorer</h1>
+<p class="text-[#4c739a] text-xs font-normal leading-normal">Select cases to compare</p>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+<span class="material-symbols-outlined text-[#4c739a]">folder</span>
+<p class="text-[#0d141b] dark:text-slate-200 text-sm font-medium">All Legal Cases</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary">
+<span class="material-symbols-outlined filled-icon">analytics</span>
+<p class="text-sm font-bold">Recent Comparisons</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+<span class="material-symbols-outlined text-[#4c739a]">gavel</span>
+<p class="text-[#0d141b] dark:text-slate-200 text-sm font-medium">Legal Precedents</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+<span class="material-symbols-outlined text-[#4c739a]">trending_up</span>
+<p class="text-[#0d141b] dark:text-slate-200 text-sm font-medium">Pattern Trends</p>
+</div>
+</div>
+<div class="flex flex-col gap-2 mt-2">
+<p class="px-3 text-[10px] font-bold text-[#4c739a] uppercase tracking-wider">Active Comparison</p>
+<div class="flex flex-col gap-2">
+<div class="p-3 border border-primary/30 rounded-lg bg-primary/5">
+<div class="flex justify-between items-start mb-1">
+<span class="text-xs font-bold text-primary">CASE-8821</span>
+<span class="material-symbols-outlined text-xs text-primary">check_circle</span>
+</div>
+<p class="text-xs font-semibold text-[#0d141b] dark:text-white truncate">Global Logistics v. Nordic</p>
+</div>
+<div class="p-3 border border-primary/30 rounded-lg bg-primary/5">
+<div class="flex justify-between items-start mb-1">
+<span class="text-xs font-bold text-primary">CASE-9042</span>
+<span class="material-symbols-outlined text-xs text-primary">check_circle</span>
+</div>
+<p class="text-xs font-semibold text-[#0d141b] dark:text-white truncate">Atlas Tech IP Dispute</p>
+</div>
+<div class="p-3 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg flex items-center justify-center gap-2 text-slate-400 cursor-pointer hover:border-primary hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm">add</span>
+<span class="text-xs font-medium">Add Case C</span>
+</div>
+</div>
+</div>
+</div>
+<button class="mt-8 flex items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold tracking-[0.015em] hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-sm mr-2">add</span>
+<span class="truncate">New Case Analysis</span>
+</button>
+</aside>
+<main class="flex-1 overflow-y-auto">
+<div class="px-8 pt-6">
+<div class="flex items-center gap-2 mb-4">
+<a class="text-[#4c739a] text-sm font-medium hover:text-primary" href="#">Intelligence</a>
+<span class="text-[#4c739a] text-sm">/</span>
+<span class="text-[#0d141b] dark:text-white text-sm font-semibold">Case Comparison</span>
+</div>
+<div class="flex flex-wrap justify-between items-end gap-3 pb-6 border-b border-slate-200 dark:border-slate-800">
+<div class="flex flex-col gap-1">
+<h1 class="text-[#0d141b] dark:text-white text-3xl font-black leading-tight tracking-[-0.033em]">Case Comparison &amp; Patterns</h1>
+<p class="text-[#4c739a] text-sm font-normal">Advanced semantic analysis across selected legal documents.</p>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-lg h-10 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#0d141b] dark:text-white text-sm font-bold hover:bg-slate-50">
+<span class="material-symbols-outlined text-sm mr-2">download</span>
+<span class="truncate">Export Report</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold hover:bg-primary/90">
+<span class="material-symbols-outlined text-sm mr-2 filled-icon">share</span>
+<span class="truncate">Share Insights</span>
+</button>
+</div>
+</div>
+</div>
+<div class="p-8">
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+<div class="grid grid-cols-12 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+<div class="col-span-3 p-4 border-r border-slate-200 dark:border-slate-800 flex items-center">
+<span class="text-xs font-bold text-[#4c739a] uppercase tracking-wider">Attribute Comparison</span>
+</div>
+<div class="col-span-4 p-5 border-r border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3">
+<div class="w-2 h-10 bg-primary rounded-full"></div>
+<div>
+<p class="text-xs font-bold text-primary">CASE A</p>
+<h3 class="text-base font-bold text-[#0d141b] dark:text-white">Global Logistics v. Nordic</h3>
+</div>
+</div>
+</div>
+<div class="col-span-5 p-5">
+<div class="flex items-center gap-3">
+<div class="w-2 h-10 bg-[#5c0000] rounded-full"></div>
+<div>
+<p class="text-xs font-bold text-[#5c0000]">CASE B</p>
+<h3 class="text-base font-bold text-[#0d141b] dark:text-white">Atlas Tech IP Dispute</h3>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800/30 px-4 py-2 border-b border-slate-200 dark:border-slate-800">
+<span class="text-[10px] font-black text-[#4c739a] uppercase tracking-widest">Key Attributes</span>
+</div>
+<div class="grid grid-cols-12 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="col-span-3 p-4 border-r border-slate-100 dark:border-slate-800 flex items-center">
+<p class="text-sm font-semibold text-[#4c739a]">Jurisdiction</p>
+</div>
+<div class="col-span-4 p-4 border-r border-slate-100 dark:border-slate-800">
+<p class="text-sm text-[#0d141b] dark:text-slate-200">SDNY - Southern District of NY</p>
+</div>
+<div class="col-span-5 p-4 flex items-center justify-between">
+<p class="text-sm text-[#0d141b] dark:text-slate-200">Northern District of California</p>
+<span class="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold rounded">DIFFERENCE</span>
+</div>
+</div>
+<div class="grid grid-cols-12 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="col-span-3 p-4 border-r border-slate-100 dark:border-slate-800 flex items-center">
+<p class="text-sm font-semibold text-[#4c739a]">Core Argument</p>
+</div>
+<div class="col-span-4 p-4 border-r border-slate-100 dark:border-slate-800">
+<p class="text-sm text-[#0d141b] dark:text-slate-200 leading-relaxed">Breach of contract regarding maritime supply chain delays during Q3 2023.</p>
+</div>
+<div class="col-span-5 p-4">
+<p class="text-sm text-[#0d141b] dark:text-slate-200 leading-relaxed">Infringement on cloud-native database architecture patents and trade secrets.</p>
+</div>
+</div>
+<div class="grid grid-cols-12 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="col-span-3 p-4 border-r border-slate-100 dark:border-slate-800 flex items-center">
+<p class="text-sm font-semibold text-[#4c739a]">Financial Impact</p>
+</div>
+<div class="col-span-4 p-4 border-r border-slate-100 dark:border-slate-800">
+<p class="text-sm font-bold text-[#0d141b] dark:text-white">$12.4M (Estimated)</p>
+</div>
+<div class="col-span-5 p-4">
+<p class="text-sm font-bold text-[#0d141b] dark:text-white">$85.0M (Potential)</p>
+</div>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800/30 px-4 py-2 border-b border-slate-200 dark:border-slate-800 mt-4">
+<span class="text-[10px] font-black text-[#4c739a] uppercase tracking-widest">Thematic Similarities &amp; Patterns</span>
+</div>
+<div class="grid grid-cols-12 border-b border-slate-100 dark:border-slate-800 bg-primary/5 dark:bg-primary/10 transition-colors">
+<div class="col-span-3 p-4 border-r border-slate-100 dark:border-slate-800 flex items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">auto_awesome</span>
+<p class="text-sm font-semibold text-primary">Shared Pattern</p>
+</div>
+</div>
+<div class="col-span-9 p-4">
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-2">
+<p class="text-sm font-bold text-[#0d141b] dark:text-white">Recursive Liability Structure</p>
+<span class="px-2 py-0.5 bg-primary text-white text-[10px] font-bold rounded">HIGH SIMILARITY</span>
+</div>
+<p class="text-sm text-[#4c739a] dark:text-slate-400">Both cases involve a third-party holding company in the Caymans with identical ownership structures. AI identifies a potential 84% probability of corporate veil overlap.</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="col-span-3 p-4 border-r border-slate-100 dark:border-slate-800 flex items-center">
+<p class="text-sm font-semibold text-[#4c739a]">Precedents Cited</p>
+</div>
+<div class="col-span-4 p-4 border-r border-slate-100 dark:border-slate-800">
+<div class="flex flex-wrap gap-1">
+<span class="bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[11px] rounded">Vandelay v. Industries</span>
+<span class="bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[11px] rounded">Maritime Law 201(a)</span>
+</div>
+</div>
+<div class="col-span-5 p-4">
+<div class="flex flex-wrap gap-1">
+<span class="bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[11px] rounded">Oracle v. Google</span>
+<span class="bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[11px] rounded">Intellectual Property Stat. 44</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+<div class="col-span-3 p-4 border-r border-slate-100 dark:border-slate-800 flex items-center">
+<p class="text-sm font-semibold text-[#4c739a]">Outcome Probability</p>
+</div>
+<div class="col-span-4 p-4 border-r border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-3">
+<div class="flex-1 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[65%]"></div>
+</div>
+<span class="text-xs font-bold">65% Win</span>
+</div>
+</div>
+<div class="col-span-5 p-4">
+<div class="flex items-center gap-3">
+<div class="flex-1 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+<div class="bg-[#5c0000] h-full w-[42%]"></div>
+</div>
+<span class="text-xs font-bold">42% Win</span>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-6 mt-8">
+<div class="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center gap-3 mb-4">
+<div class="p-2 bg-primary/10 dark:bg-primary/20 rounded-lg">
+<span class="material-symbols-outlined text-primary">group_work</span>
+</div>
+<h4 class="text-sm font-bold text-[#0d141b] dark:text-white">Thematic Similarity</h4>
+</div>
+<p class="text-xs text-[#4c739a] leading-relaxed mb-3">Strong correlation found in discovery motions and expert witness profiles between Case A and Case B.</p>
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-bold text-primary uppercase">Match Score</span>
+<span class="text-sm font-black">72%</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center gap-3 mb-4">
+<div class="p-2 bg-primary/10 dark:bg-primary/20 rounded-lg">
+<span class="material-symbols-outlined text-primary">psychology</span>
+</div>
+<h4 class="text-sm font-bold text-[#0d141b] dark:text-white">Pattern Analysis</h4>
+</div>
+<p class="text-xs text-[#4c739a] leading-relaxed mb-3">Historical data suggests a 14-month lifecycle for this specific combination of litigation types.</p>
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-bold text-primary uppercase">Avg Duration</span>
+<span class="text-sm font-black">425 Days</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center gap-3 mb-4">
+<div class="p-2 bg-green-100 dark:bg-green-900/40 rounded-lg">
+<span class="material-symbols-outlined text-green-600 dark:text-green-400">shield</span>
+</div>
+<h4 class="text-sm font-bold text-[#0d141b] dark:text-white">Risk Exposure</h4>
+</div>
+<p class="text-xs text-[#4c739a] leading-relaxed mb-3">Combined potential liability exposure exceeds current legal reserve allocations for Q4.</p>
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-bold text-green-600 uppercase">Risk Level</span>
+<span class="text-sm font-black text-amber-500">ELEVATED</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+
+</body></html>

@@ -1,0 +1,50 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: qpp-backend
+spec:
+  serviceAccount: builder
+  source:
+    type: Git
+    git:
+      uri: https://github.com/rulhaq/doc-intelligence.git
+      ref: qpp-poc-v2
+    contextDir: backend
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: DockerImage
+      name: imageregistry.pp.gov.qa/scalovate/qpp-backend:latest
+    pushSecret:
+      name: quay-push-secret
+  triggers:
+    - type: ConfigChange
+
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: qpp-frontend
+spec:
+  serviceAccount: builder
+  source:
+    type: Git
+    git:
+      uri: https://github.com/rulhaq/doc-intelligence.git
+      ref: qpp-poc-v2
+    contextDir: frontend
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: DockerImage
+      name: imageregistry.pp.gov.qa/scalovate/qpp-frontend:latest
+    pushSecret:
+      name: quay-push-secret
+  triggers:
+    - type: ConfigChange

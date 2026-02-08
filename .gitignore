@@ -1,0 +1,112 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+dist-ssr/
+*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Data
+data/documents/*
+!data/documents/.gitkeep
+data/sample-data/*.txt
+!data/sample-data/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Hugging Face cache
+.cache/huggingface/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+
+AGENT.md
+
+SECURITY.md
+
+# Project docs (do not version in this repo)
+APP_SUMMARY.md
+BILINGUAL_SETUP.md
+CHANGELOG.md
+CONTRIBUTING.md
+PROJECT_AUDIT.md
+SCOPE_DEFINITION_EMAIL.md
+SCOPE_EMAIL.txt
+
