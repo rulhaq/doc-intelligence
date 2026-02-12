@@ -6,5 +6,10 @@ class ChatAgent(BaseAgent):
 
     async def ask(self, question: str) -> str:
         context = await self.get_context(question)
-        prompt = f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer the question using ONLY the provided context. Cite your sources clearly."
+        prompt = (
+            f"Context:\n{context}\n\n"
+            f"Question: {question}\n\n"
+            f"{self.language_instruction(question, context)}\n"
+            "Answer the question using ONLY the provided context. Cite your sources clearly."
+        )
         return await self.run(prompt)

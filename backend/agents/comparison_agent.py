@@ -7,6 +7,7 @@ class ComparisonAgent(BaseAgent):
     async def compare_cases(self, case_a: str, case_b: str) -> str:
         context_a = await self.get_context(case_a)
         context_b = await self.get_context(case_b)
+        lang_instruction = self.language_instruction(case_a, case_b, context_a, context_b)
         
         prompt = f"""
         Case A Context:
@@ -14,6 +15,8 @@ class ComparisonAgent(BaseAgent):
         
         Case B Context:
         {context_b}
+
+        {lang_instruction}
         
         Compare these two cases across:
         1. Jurisdiction

@@ -6,10 +6,20 @@ class IntelligenceAgent(BaseAgent):
 
     async def summarize_case(self, case_name: str) -> str:
         context = await self.get_context(f"Summarize case {case_name}")
-        prompt = f"Context:\n{context}\n\nProvide a high-level executive summary of {case_name}. Include key alignment with precedents, critical anomalies, and foundational liability risks."
+        prompt = (
+            f"Context:\n{context}\n\n"
+            f"{self.language_instruction(case_name, context)}\n"
+            f"Provide a high-level executive summary of {case_name}. "
+            "Include key alignment with precedents, critical anomalies, and foundational liability risks."
+        )
         return await self.run(prompt)
 
     async def extract_signals(self, case_name: str) -> str:
         context = await self.get_context(f"Extract risks and signals for {case_name}")
-        prompt = f"Context:\n{context}\n\nIdentify and extract critical legal signals (e.g., contractual breaches, hidden assets) from the documents related to {case_name}."
+        prompt = (
+            f"Context:\n{context}\n\n"
+            f"{self.language_instruction(case_name, context)}\n"
+            f"Identify and extract critical legal signals (e.g., contractual breaches, hidden assets) "
+            f"from the documents related to {case_name}."
+        )
         return await self.run(prompt)

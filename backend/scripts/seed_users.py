@@ -6,6 +6,13 @@ via OpenShift Secrets.
 """
 
 import os
+import sys
+from pathlib import Path
+
+# Allow running as `python scripts/seed_users.py` without requiring PYTHONPATH.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from models.database import SessionLocal, User, init_db
 from services.auth_service import get_password_hash
@@ -17,6 +24,9 @@ def _get_env(name: str, default: str) -> str:
 
 
 def _ensure_user(*, username: str, password: str, is_admin: bool) -> None:
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError(f"Password for '{username}' exceeds bcrypt limit (72 bytes).")
+
     db = SessionLocal()
     try:
         existing = db.query(User).filter(User.username == username).first()
@@ -52,4 +62,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

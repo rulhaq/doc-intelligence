@@ -85,7 +85,9 @@ def init_db():
     if _env_bool("SEED_DEFAULT_ADMIN", False):
         username = (os.getenv("SEED_DEFAULT_ADMIN_USERNAME") or "judge1").strip()
         password = (os.getenv("SEED_DEFAULT_ADMIN_PASSWORD") or "judge1234").strip()
-        if username and not db.query(User).filter(User.username == username).first():
+        if len(password.encode("utf-8")) > 72:
+            print("Skipping default admin seed: bcrypt password length must be <= 72 bytes.")
+        elif username and not db.query(User).filter(User.username == username).first():
             hashed_pw = pwd_context.hash(password)
             admin_user = User(username=username, hashed_password=hashed_pw, is_admin=True)
             db.add(admin_user)

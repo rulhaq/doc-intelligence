@@ -15,7 +15,11 @@ spec:
       containers:
         - name: db-seed
           image: imageregistry.pp.gov.qa/scalovate/qpp-backend:latest
+          workingDir: /app
           imagePullPolicy: Always
+          env:
+            - name: PYTHONPATH
+              value: /app
           envFrom:
             - secretRef:
                 name: qpp-secrets

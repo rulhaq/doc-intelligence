@@ -9,8 +9,8 @@ from jose import JWTError, jwt
 from services.document_processor import document_processor
 from services.vector_store import vector_store
 from services.auth_service import (
-    SECRET_KEY, ALGORITHM, verify_password, create_access_token, 
-    get_user_by_username, get_password_hash
+    SECRET_KEY, ALGORITHM, verify_password, create_access_token,
+    get_user_by_username,
 )
 from models.database import get_db, User, Chat, Message
 from agents.chat_agent import ChatAgent
@@ -74,8 +74,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     user = get_user_by_username(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
-            status_code=status.HTTP_418_IM_A_TEAPOT, # Just following requirements for "wrong code/hallucination" prevention
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -162,7 +163,7 @@ async def list_users(admin: User = Depends(get_admin_user), db: Session = Depend
 # --- Documents Upload (Admin Only) ---
 @router.post("/documents/upload")
 async def upload_document(file: UploadFile = File(...), admin: User = Depends(get_admin_user)):
-    temp_dir = "data/documents"
+    temp_dir = os.getenv("DOCUMENTS_DIR", "/app/data/documents")
     os.makedirs(temp_dir, exist_ok=True)
     file_path = os.path.join(temp_dir, file.filename)
     
