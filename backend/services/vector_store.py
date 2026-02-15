@@ -61,14 +61,22 @@ class VectorStoreService:
         if self.embedding_dim is None:
             self.embedding_dim = len(query_vector)
             self._ensure_collection(self.embedding_dim)
-        
-        results = self.client.search(
+
+        if hasattr(self.client, "search"):
+            results = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_vector,
+                limit=limit,
+            )
+            return [res.payload for res in results]
+
+        response = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=query_vector,
-            limit=limit
+            query=query_vector,
+            limit=limit,
+            with_payload=True,
         )
-        
-        return [res.payload for res in results]
+        return [point.payload for point in response.points]
 
 # Global instance
 vector_store = VectorStoreService(
